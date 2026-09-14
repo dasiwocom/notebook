@@ -85,6 +85,7 @@ function PreviewMarkdown({
 export type HighlightReq = {
   section: string;
   nonce: number;
+  doc_id?: string;
   query?: string;
   snippet?: string;
 };
@@ -242,6 +243,7 @@ export function DocumentPanel({
   // jump & flash from citation click
   useEffect(() => {
     if (!highlight || !doc) return;
+    if (highlight.doc_id && highlight.doc_id !== doc.id) return;
     const leaf = highlight.section.split(">").pop()?.trim();
     const el = contentRef.current;
     if (!el || !leaf) return;
@@ -270,6 +272,7 @@ export function DocumentPanel({
     if (!m) return;
     const pg = parseInt(m[1], 10);
     if (pg < 1 || pg > pageCount) return;
+    if (highlight.doc_id && highlight.doc_id !== doc.id) return;
     const raf = requestAnimationFrame(() => {
       const el = document.getElementById(`bs-page-${pg}`);
       if (el) {
@@ -291,6 +294,7 @@ export function DocumentPanel({
     if (!m) return;
     const pg = parseInt(m[1], 10);
     if (pg < 1 || pg > pageCount) return;
+    if (highlight.doc_id && highlight.doc_id !== doc.id) return;
     const query = highlight.query ?? "";
     const snippet = highlight.snippet ?? "";
     if (!query && !snippet) return;
@@ -693,6 +697,7 @@ export function DocumentPanel({
                       <div
                         key={n}
                         id={`bs-page-${n}`}
+                        style={{ contentVisibility: "auto", containIntrinsicSize: "auto 900px" }}
                         className={`relative overflow-hidden rounded-xl transition-colors ${
                           flashPage === n
                             ? "ring-2 ring-amber-300 dark:ring-amber-500/70"

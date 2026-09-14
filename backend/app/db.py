@@ -5,6 +5,8 @@ import time
 import uuid
 from pathlib import Path
 
+import numpy as np
+
 from . import config
 
 _lock = threading.Lock()
@@ -84,6 +86,7 @@ def _init(conn: sqlite3.Connection) -> None:
             color TEXT NOT NULL DEFAULT '#f2f2e8',
             content TEXT NOT NULL DEFAULT '',
             structured TEXT,
+            citations TEXT,
             created_at REAL NOT NULL
         );
         CREATE INDEX IF NOT EXISTS idx_studies_conv ON studies(conv_id);
@@ -94,7 +97,24 @@ def _init(conn: sqlite3.Connection) -> None:
         conn.execute(
             "ALTER TABLE documents ADD COLUMN status TEXT NOT NULL DEFAULT 'ready'"
         )
+    scol = {r[1] for r in conn.execute("PRAGMA table_info(studies)")}
+    if "citations" not in scol:
+        conn.execute("ALTER TABLE studies ADD COLUMN citations TEXT")
     conn.commit()
+
+
+def _encode_embedding(emb: list[float]) -> bytes:
+    """float32 字节存储：比 JSON 文本小约 10×，读取更快。"""
+    return np.asarray(emb, dtype=np.float32).tobytes()
+
+
+def _decode_embedding(raw) -> list[float]:
+    """读取向量：旧数据是 JSON 文本(str)，新数据是 float32 字节(bytes)。"""
+    if raw is None:
+        return []
+    if isinstance(raw, str):
+        return json.loads(raw)
+    return np.frombuffer(raw, dtype=np.float32).tolist()
 
 
 def insert_document(name: str, content: str, status: str = "processing") -> str:
@@ -140,7 +160,7 @@ def insert_chunks(doc_id: str, chunks: list[dict], embeddings: list[list[float] 
                 c["text"],
                 c["char_start"],
                 c["char_end"],
-                json.dumps(emb) if emb is not None else None,
+                _encode_embedding(emb) if emb is not None else None,
             )
             for c, emb in zip(chunks, embeddings)
             if emb is not None
@@ -175,7 +195,7 @@ def replace_document(
                 c["text"],
                 c["char_start"],
                 c["char_end"],
-                json.dumps(emb) if emb is not None else None,
+                _encode_embedding(emb) if emb is not None else None,
             )
             for c, emb in zip(chunks, embeddings)
             if emb is not None
@@ -281,7 +301,7 @@ def get_indexed_chunks() -> list[dict]:
             "doc_name": r["doc_name"],
             "path": json.loads(r["path"]),
             "text": r["text"],
-            "embedding": json.loads(r["embedding"]),
+            "embedding": _decode_embedding(r["embedding"]),
         }
         for r in rows
     ]
@@ -481,8 +501,8 @@ def replace_studies(conv_id: str, studies: list[dict]) -> None:
         conn.execute("DELETE FROM studies WHERE conv_id = ?", (conv_id,))
         now = time.time()
         conn.executemany(
-            "INSERT INTO studies (id, conv_id, label, color, content, structured, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO studies (id, conv_id, label, color, content, structured, citations, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             [
                 (
                     str(s.get("id", "")),
@@ -491,6 +511,7 @@ def replace_studies(conv_id: str, studies: list[dict]) -> None:
                     s.get("color", "#f2f2e8"),
                     s.get("content", "") or "",
                     json.dumps(s.get("structured"), ensure_ascii=False),
+                    json.dumps(s.get("citations") or [], ensure_ascii=False),
                     s.get("created_at", now) or now,
                 )
                 for s in studies
@@ -503,7 +524,7 @@ def replace_studies(conv_id: str, studies: list[dict]) -> None:
 def list_studies(conv_id: str) -> list[dict]:
     conn = get_conn()
     rows = conn.execute(
-        "SELECT id, label, color, content, structured, created_at "
+        "SELECT id, label, color, content, structured, citations, created_at "
         "FROM studies WHERE conv_id = ? ORDER BY created_at DESC",
         (conv_id,),
     ).fetchall()
@@ -514,5 +535,9 @@ def list_studies(conv_id: str) -> list[dict]:
             d["structured"] = json.loads(d["structured"])
         except (json.JSONDecodeError, ValueError, TypeError):
             d["structured"] = None
+        try:
+            d["citations"] = json.loads(d["citations"])
+        except (json.JSONDecodeError, ValueError, TypeError):
+            d["citations"] = []
         out.append(d)
     return out

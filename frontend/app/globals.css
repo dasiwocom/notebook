@@ -252,4 +252,15 @@ a:has(svg) {
   .mb-head {
     display: none !important;
   }
+  /* Chat 面板头部保留：移动端也需要会话切换/设置/清空入口 */
+  .mb-chat-head {
+    display: flex !important;
+  }
+}
+
+/* 触屏设备无 hover：hover-only 展示的按钮（删除等）改为常显 */
+@media (hover: none) {
+  .opacity-0.group-hover\:opacity-100 {
+    opacity: 1;
+  }
 }

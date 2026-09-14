@@ -24,6 +24,7 @@ import {
   Zap,
 } from "lucide-react";
 import { chatStream, createNote, deleteNote, listNotes, listStudies, syncStudies, updateNote } from "../lib/api";
+import type { Citation } from "../lib/types";
 
 type Tool = {
   label: string;
@@ -88,6 +89,7 @@ type Output = {
   content: string;
   error?: string;
   structured?: MindMapNode | QuizQuestion[] | null;
+  citations?: Citation[];
   ts: number;
 };
 
@@ -107,16 +109,63 @@ type Props = {
   hasDoc: boolean;
   docId?: string | null;
   convId?: string | null;
+  onCite: (citation: Citation) => void;
 };
 
 function toCiteMarkdown(content: string): string {
-  return content.replace(
-    /\[source:(\d+)\]/g,
-    (_m, idx: string) => `[${Number(idx) + 1}]`
+  // 密集编号：[source:N] → [d+1](#cite-d)，d 按首次出现顺序分配，与 citations 密集顺序一致
+  const dense = new Map<number, number>();
+  return content.replace(/\[source:(\d+)\]/g, (_m, idx: string) => {
+    const n = Number(idx);
+    let d = dense.get(n);
+    if (d === undefined) {
+      d = dense.size;
+      dense.set(n, d);
+    }
+    return `[${d + 1}](#cite-${d})`;
+  });
+}
+
+function CitationLink({ n, onCite }: { n: number; onCite: (n: number) => void }) {
+  return (
+    <button
+      onClick={() => onCite(n)}
+      className="mx-0.5 inline-flex -translate-y-px items-center rounded-full bg-zinc-100 px-[7px] py-0.5 text-[11px] font-semibold tabular-nums text-zinc-600 transition-colors hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+      title="View source"
+    >
+      {n + 1}
+    </button>
   );
 }
 
-function OutputMarkdown({ content }: { content: string }) {
+function OutputMarkdown({
+  content,
+  citations,
+  onCite,
+}: {
+  content: string;
+  citations?: Citation[];
+  onCite?: (c: Citation) => void;
+}) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const components = {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    a: ({ href, children, ...rest }: any) => {
+      if (typeof href === "string" && href.startsWith("#cite-")) {
+        const n = parseInt(href.slice(6), 10);
+        const c = citations?.[n];
+        if (c && onCite) {
+          return <CitationLink n={n} onCite={() => onCite(c)} />;
+        }
+        return <span>[{n + 1}]</span>;
+      }
+      return (
+        <a href={href} {...rest}>
+          {children}
+        </a>
+      );
+    },
+  };
   return (
     <div
       className="prose prose-sm max-w-none dark:prose-invert
@@ -139,7 +188,7 @@ function OutputMarkdown({ content }: { content: string }) {
       dark:prose-blockquote:border-zinc-700 dark:prose-blockquote:text-zinc-400
       dark:prose-hr:border-white/10 dark:prose-th:text-zinc-200"
     >
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
         {toCiteMarkdown(content)}
       </ReactMarkdown>
     </div>
@@ -271,6 +320,7 @@ export function ToolsPanel({
   hasDoc,
   docId,
   convId,
+  onCite,
 }: Props) {
   const [outputs, setOutputs] = useState<Output[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
@@ -300,6 +350,7 @@ export function ToolsPanel({
             expanded: true,
             content: (s.content ?? "").trim(),
             structured: (s.structured as Output["structured"]) ?? undefined,
+            citations: (s.citations ?? []) as Citation[],
             ts: Date.now() - (list.length - 1 - i) * 1000,
           }))
         )
@@ -337,6 +388,7 @@ export function ToolsPanel({
           color: o.color,
           content: o.content,
           structured: o.structured ?? null,
+          citations: o.citations ?? [],
         }));
       syncStudies(convId, done).catch(() => {});
     }, 700);
@@ -387,6 +439,7 @@ export function ToolsPanel({
       abortRef.current.set(id, ctrl);
 
       let structured: MindMapNode | QuizQuestion[] | null | undefined;
+      let citations: Citation[] | undefined;
 
       setOutputs((prev) => [
         {
@@ -419,12 +472,15 @@ export function ToolsPanel({
               );
             } else if (ev.type === "done") {
               structured = ev.structured as MindMapNode | QuizQuestion[] | null | undefined;
+              citations = ev.citations;
             }
           },
         });
         setOutputs((prev) =>
           prev.map((o) =>
-            o.id === id ? { ...o, status: "done", structured: structured ?? o.structured } : o
+            o.id === id
+              ? { ...o, status: "done", structured: structured ?? o.structured, citations: citations ?? o.citations }
+              : o
           )
         );
       } catch (e) {
@@ -600,6 +656,7 @@ export function ToolsPanel({
                     onStop={() => abortRef.current.get(it.o.id)?.abort()}
                     onSaveToNotes={saveOutputToNotes}
                     onDismiss={() => dismiss(it.o.id)}
+                    onCite={onCite}
                   />
                 ) : (
                   <NoteCard
@@ -642,6 +699,7 @@ function OutputCard({
   onStop,
   onSaveToNotes,
   onDismiss,
+  onCite,
 }: {
   o: Output;
   docId?: string | null;
@@ -649,6 +707,7 @@ function OutputCard({
   onStop: () => void;
   onSaveToNotes: (content: string) => void;
   onDismiss: () => void;
+  onCite: (c: Citation) => void;
 }) {
   const [saved, setSaved] = useState(false);
   const isMindMap =
@@ -732,7 +791,7 @@ function OutputCard({
           ) : isQuiz ? (
             <QuizCards questions={o.structured as QuizQuestion[]} />
           ) : o.content.trim() ? (
-            <OutputMarkdown content={o.content} />
+            <OutputMarkdown content={o.content} citations={o.citations} onCite={onCite} />
           ) : (
             <p className="text-sm text-zinc-400 dark:text-zinc-500">Waiting…</p>
           )}

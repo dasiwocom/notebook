@@ -1,6 +1,7 @@
 import type {
   ChatMessage,
   ChatStreamEvent,
+  Citation,
   DocumentDetail,
   DocumentInfo,
   HistoryMessage,
@@ -288,6 +289,7 @@ export type StudyRecord = {
   color?: string;
   content: string;
   structured?: unknown | null;
+  citations?: Citation[];
   created_at?: number;
   expanded?: boolean;
 };

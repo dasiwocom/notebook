@@ -7,6 +7,7 @@ import {
   Check,
   ChevronDown,
   Copy,
+  Download,
   MoreVertical,
   Plus,
   Quote,
@@ -363,9 +364,29 @@ export function ChatPanel({
     onSend(text);
   };
 
+  const exportConversation = () => {
+    if (messages.length === 0) return;
+    const md = messages
+      .map((m) =>
+        m.role === "user"
+          ? `**You**\n\n${m.content}`
+          : `**Assistant**\n\n${toCopyMarkdown(m.content)}`
+      )
+      .join("\n\n---\n\n");
+    const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "notebook-conversation.md";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <main className="flex h-full min-w-0 flex-1 flex-col">
-      <div className="mb-head flex h-12 shrink-0 items-center justify-between border-b border-black/[0.05] px-4 dark:border-white/10">
+      <div className="mb-head mb-chat-head flex h-12 shrink-0 items-center justify-between border-b border-black/[0.05] px-4 dark:border-white/10">
         <div className="relative min-w-0" data-conv-menu>
           <button
             onClick={() => setConvMenuOpen((v) => !v)}
@@ -457,6 +478,16 @@ export function ChatPanel({
               >
                 <Trash2 className="h-4 w-4" strokeWidth={2} />
                 Clear chat
+              </button>
+              <button
+                onClick={() => {
+                  exportConversation();
+                  setMenuOpen(false);
+                }}
+                className="flex w-full items-center gap-2.5 px-3 py-2 text-[13px] text-zinc-600 transition-colors hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-[#32383e]"
+              >
+                <Download className="h-4 w-4" strokeWidth={2} />
+                Export .md
               </button>
               <button
                 onClick={() => {

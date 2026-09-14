@@ -26,7 +26,7 @@ import {
   uploadDocument,
 } from "./lib/api";
 import type { ConversationInfo, LoadedMessage, PersistentMessage } from "./lib/api";
-import type { ChatMessage, DocumentDetail, DocumentInfo } from "./lib/types";
+import type { ChatMessage, Citation, DocumentDetail, DocumentInfo } from "./lib/types";
 
 const SIDEBAR_MIN = 200;
 const SIDEBAR_MAX = 640;
@@ -508,7 +508,24 @@ export default function Home() {
       setHighlightReq((prev) => ({
         section: citation.section,
         nonce: (prev?.nonce ?? 0) + 1,
+        doc_id: citation.doc_id,
         query,
+        snippet: citation.snippet,
+      }));
+    },
+    [selectedId]
+  );
+
+  // Studio 产出卡片的引用跳转：直接给定引用对象（不在 messages 里）
+  const handleSourceJump = useCallback(
+    (citation: Citation) => {
+      setMobileTab("docs");
+      if (citation.doc_id !== selectedId) setSelectedId(citation.doc_id);
+      setHighlightReq((prev) => ({
+        section: citation.section,
+        nonce: (prev?.nonce ?? 0) + 1,
+        doc_id: citation.doc_id,
+        query: "",
         snippet: citation.snippet,
       }));
     },
@@ -709,6 +726,7 @@ export default function Home() {
           hasDoc={conversationIds.size > 0}
           docId={conversationIds.size === 1 ? [...conversationIds][0] : null}
           convId={convId}
+          onCite={handleSourceJump}
         />
       </div>
 
