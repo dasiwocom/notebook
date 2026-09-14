@@ -111,7 +111,7 @@ function Divider({
       title="Double-click to reset widths"
       className={`group relative z-10 w-3 shrink-0 cursor-col-resize touch-none select-none ${className}`}
     >
-      <div className="absolute inset-y-0 left-1/2 w-[5px] -translate-x-1/2 border-x border-black/[0.06] transition-colors group-hover:bg-zinc-300/80 group-active:bg-[#0b57d0]/60 dark:border-white/10 dark:group-hover:bg-zinc-600" />
+      <div className="absolute inset-y-0 left-1/2 w-1 -translate-x-1/2 bg-transparent transition-colors group-hover:bg-zinc-300/70 group-active:bg-[#0b57d0]/60 dark:group-hover:bg-zinc-600" />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -337,12 +337,12 @@ export function ToolsPanel({
     return () => window.clearTimeout(t);
   }, [outputs, convId]);
 
-  const items = useCallback(() => {
+  const items = useMemo(() => {
     return [
       ...outputs.map((o) => ({ kind: "output" as const, o, ts: o.ts })),
       ...notes.map((n) => ({ kind: "note" as const, n, ts: n.updated_at })),
     ].sort((a, b) => b.ts - a.ts);
-  }, [outputs, notes])();
+  }, [outputs, notes]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -829,13 +829,11 @@ function NoteCard({
                 </button>
               </div>
             </>
+          ) : n.content.trim() ? (
+            <OutputMarkdown content={n.content} />
           ) : (
-            <p className="whitespace-pre-wrap text-[13px] leading-6 text-zinc-700 dark:text-zinc-300">
-              {n.content || (
-                <span className="italic text-zinc-400 dark:text-zinc-500">
-                  Empty note
-                </span>
-              )}
+            <p className="italic text-[13px] text-zinc-400 dark:text-zinc-500">
+              Empty note
             </p>
           )}
         </div>

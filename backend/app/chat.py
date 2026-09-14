@@ -79,12 +79,36 @@ def has_llm_key() -> bool:
     return bool(settings.get("DEEPSEEK_API_KEY", config.DEEPSEEK_API_KEY))
 
 
+# context 字符预算：防止 TOP_K 在设置里被调大后，拼接的源材料逼近模型上下文上限。
+_MAX_CONTEXT_CHARS = 12000
+
+
 def _build_context(results: list[dict]) -> str:
     parts = []
+    total = 0
     for i, r in enumerate(results):
         section = " > ".join(r["path"]) if r["path"] else "文档开头"
-        parts.append(f'[source:{i}] 来自「{r["doc_name"]}」| 章节：{section}\n{r["text"]}')
+        block = f'[source:{i}] 来自「{r["doc_name"]}」| 章节：{section}\n{r["text"]}'
+        if parts and total + len(block) > _MAX_CONTEXT_CHARS:
+            break
+        parts.append(block)
+        total += len(block)
     return "\n\n".join(parts)
+
+
+def _bigrams(text: str) -> set[str]:
+    """字符级 bigram：中文词边界模糊，用字符 n-gram 做轻量相似度。"""
+    chars = [c for c in text.lower() if not c.isspace()]
+    return {"".join(chars[i : i + 2]) for i in range(max(0, len(chars) - 1))}
+
+
+def _citation_overlap(answer: str, chunk: str) -> float:
+    """被引 chunk 与答案的字符 bigram 重叠比例（以 chunk 为分母）。
+    用于「逐句有据」的轻量校验：重叠接近 0 说明引用大概率张冠李戴。"""
+    ga, gb = _bigrams(answer), _bigrams(chunk)
+    if not gb:
+        return 0.0
+    return len(ga & gb) / len(gb)
 
 
 def _parse_citations(answer: str, results: list[dict]) -> list[dict]:
@@ -98,12 +122,15 @@ def _parse_citations(answer: str, results: list[dict]) -> list[dict]:
         r = results[i]
         citations.append(
             {
+                "source": i,  # 源索引，便于前端做显式映射/校验
                 "chunk_id": r["chunk_id"],
                 "doc_id": r["doc_id"],
                 "doc_name": r["doc_name"],
                 "section": " > ".join(r["path"]) if r["path"] else "文档开头",
                 "snippet": r["text"][:220].replace("\n", " ").strip(),
                 "score": round(r["score"], 3),
+                # 逐句有据校验：被引 chunk 与答案几乎零重叠 → 疑似编造/张冠李戴
+                "verified": _citation_overlap(answer, r["text"]) >= 0.05,
             }
         )
     return citations
@@ -366,46 +393,5 @@ def answer_stream(
         yield {"type": "error", "text": f"请求失败：{exc}"}
 
 
-def answer(question: str, *, doc_id: str | None = None) -> dict:
-    """Non-streaming fallback used by CLI / tests."""
-    if not has_llm_key():
-        return {
-            "answer": "还没有配置 DeepSeek API Key，请在 backend/.env 里填写 DEEPSEEK_API_KEY。",
-            "citations": [],
-            "sources": [],
-        }
-    try:
-        vectors = embed_texts([question])
-    except Exception as exc:
-        return {"answer": f"嵌入服务不可用，请检查模型端点配置：{exc}", "citations": [], "sources": []}
-    if not vectors:
-        return {"answer": "嵌入服务没有返回向量，请检查模型端点配置。", "citations": [], "sources": []}
-    results = retriever.search(vectors[0], query_text=question, doc_id=doc_id)
-    if not results:
-        return {
-            "answer": _no_context_answer("没有检索到相关内容"),
-            "citations": [],
-            "sources": [],
-        }
-
-    context = _build_context(results)
-    resp = _get_client().chat.completions.create(
-        model=chat_model(),
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": f"源材料：\n{context}\n\n问题：{question}"},
-        ],
-        temperature=0.2,
-    )
-    answer_text = resp.choices[0].message.content or ""
-    answer_text = _strip_suggest(answer_text)
-    citations = _parse_citations(answer_text, results)
-    sources = [
-        {
-            "doc_name": r["doc_name"],
-            "section": " > ".join(r["path"]) if r["path"] else "文档开头",
-            "score": round(r["score"], 3),
-        }
-        for r in results
-    ]
-    return {"answer": answer_text, "citations": citations, "sources": sources}
+# `answer()` 非流式兜底已删除：无任何调用方，且与主路径 answer_stream() 的
+# judge/rewrite/study 分流行为不一致，保留只会让 CLI/测试路径给出不同结果。

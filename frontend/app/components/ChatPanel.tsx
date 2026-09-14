@@ -54,8 +54,10 @@ const MAX_BADGES_PER_SOURCE = 2;
 const MAX_BADGES_TOTAL = 48;
 
 function toCiteMarkdown(content: string): string {
-  // 角标去噪：[source:N] → 可点击角标；同一来源全篇最多亮 MAX_BADGES_PER_SOURCE 次（连续重复只算一次），
-  // 超过就丢弃，避免模型逐句重复引用同一来源时一屏几十上百个角标。
+  // 角标去噪 + 密集编号：[source:N] → 可点击角标 [d+1]。
+  // d 按「首次出现顺序」从 0 开始分配，与后端 citations 的密集顺序一致，
+  // 避免跳号引用（只引 source:0 和 source:2）时角标错位、点击错源。
+  const dense = new Map<number, number>();
   const perSource = new Map<number, number>();
   let total = 0;
   let last: { n: number; end: number } | null = null;
@@ -67,13 +69,18 @@ function toCiteMarkdown(content: string): string {
     const n = Number(m[1]);
     const dupAdjacent = last !== null && last.n === n && last.end === m.index;
     last = { n, end: re.lastIndex };
+    let d = dense.get(n);
+    if (d === undefined) {
+      d = dense.size;
+      dense.set(n, d);
+    }
     const atCap =
-      (perSource.get(n) ?? 0) >= MAX_BADGES_PER_SOURCE ||
+      (perSource.get(d) ?? 0) >= MAX_BADGES_PER_SOURCE ||
       total >= MAX_BADGES_TOTAL;
     parts.push(content.slice(pos, m.index));
     if (!dupAdjacent && !atCap) {
-      parts.push(`[${n + 1}](#cite-${n})`);
-      perSource.set(n, (perSource.get(n) ?? 0) + 1);
+      parts.push(`[${d + 1}](#cite-${d})`);
+      perSource.set(d, (perSource.get(d) ?? 0) + 1);
       total += 1;
     }
     pos = re.lastIndex;
