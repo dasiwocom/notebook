@@ -28,6 +28,10 @@ MMR_LAMBDA = float(os.getenv("MMR_LAMBDA", "0.7"))
 RERANKER_MODEL = os.getenv("RERANKER_MODEL", "BAAI/bge-reranker-base")
 HISTORY_LIMIT = int(os.getenv("HISTORY_LIMIT", "12"))
 
+# LLM 重排（LLM-as-reranker）：检索出候选后，用 LLM 按语义相关性重排，明显提升精度。
+# 云端 API token 便宜，默认开启；本地小模型下可设 LLM_RERANK_ENABLED=0 关闭以省延迟。
+LLM_RERANK_ENABLED = os.getenv("LLM_RERANK_ENABLED", "1") == "1"
+
 DB_PATH = os.getenv("DB_PATH") or str(_BASE_DIR / "data" / "app.db")
 PORT = int(os.getenv("PORT", "8000"))
 

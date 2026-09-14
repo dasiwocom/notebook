@@ -17,6 +17,7 @@ export type Citation = {
   section: string;
   snippet: string;
   score: number;
+  verified?: boolean;
 };
 
 export type Source = {

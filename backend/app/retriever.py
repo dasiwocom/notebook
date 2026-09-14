@@ -1,3 +1,4 @@
+import math
 import re
 from typing import Any
 
@@ -7,26 +8,24 @@ from . import config, db, settings
 from .reranker import reranker
 
 
+def _bigrams(text: str) -> set[str]:
+    """字符级 bigram（中文无词边界，用字符 n-gram 做词法匹配）。"""
+    chars = [c for c in text.lower() if not c.isspace()]
+    return {"".join(chars[i : i + 2]) for i in range(max(0, len(chars) - 1))}
+
+
 def _lexical_fuzzy(q: str, passages: list[str]) -> list[float]:
     """字符 bigram 的 F1 相似度 —— cross-encoder 不可用时的回退重排。
 
     同时考虑「查询词覆盖」（召回）与「命中密度」（精确），比单纯覆盖率更稳，
     避免长段落因碰巧含更多查询字而被高估。
     """
-
-    def grams(text: str) -> set[str]:
-        chars = [c for c in text.lower() if not c.isspace()]
-        return {
-            "".join(chars[i : i + 2])
-            for i in range(max(0, len(chars) - 1))
-        }
-
-    qg = grams(q)
+    qg = _bigrams(q)
     if not qg:
         return [0.0] * len(passages)
     out: list[float] = []
     for p in passages:
-        pg = grams(p)
+        pg = _bigrams(p)
         if not pg:
             out.append(0.0)
             continue
@@ -83,6 +82,10 @@ class Retriever:
         self._texts: list[str] = []
         self._matrix: np.ndarray | None = None
         self._norm: np.ndarray | None = None
+        # BM25 词法索引（混合检索）
+        self._bigram_df: dict[str, int] = {}
+        self._chunk_bigrams: list[set[str]] = []
+        self._chunk_len: list[int] = []
         self.reload()
 
     def reload(self) -> None:
@@ -101,6 +104,49 @@ class Retriever:
         else:
             self._matrix = None
             self._norm = None
+        # 构建字符 bigram 的 BM25 词法索引
+        self._bigram_df = {}
+        self._chunk_bigrams = []
+        self._chunk_len = []
+        for r in rows:
+            g = _bigrams(r["text"])
+            self._chunk_bigrams.append(g)
+            self._chunk_len.append(len(r["text"]))
+            for bg in g:
+                self._bigram_df[bg] = self._bigram_df.get(bg, 0) + 1
+
+    def _bm25_scores(self, query: str) -> np.ndarray:
+        """字符 bigram BM25 打分（全库）。"""
+        n = len(self._chunk_ids)
+        qg = _bigrams(query)
+        if n == 0 or not qg:
+            return np.zeros(n, dtype=np.float32)
+        avgdl = sum(self._chunk_len) / n
+        k1, b = 1.5, 0.75
+        scores = np.zeros(n, dtype=np.float32)
+        for g in qg:
+            df = self._bigram_df.get(g, 0)
+            if df == 0:
+                continue
+            idf = math.log((n - df + 0.5) / (df + 0.5) + 1.0)
+            for i in range(n):
+                if g in self._chunk_bigrams[i]:
+                    dl = self._chunk_len[i] or 1
+                    tf = 1.0  # 字符 bigram 二元命中即可
+                    scores[i] += idf * (tf * (k1 + 1.0)) / (tf + k1 * (1.0 - b + b * dl / avgdl))
+        return scores
+
+    def _fused_order(self, dense: np.ndarray, query: str) -> np.ndarray:
+        """dense 与 BM25 用 RRF 融合排序：兼顾语义相关与精确关键词召回。"""
+        bm25 = self._bm25_scores(query)
+        k = 60
+        rrf: dict[int, float] = {}
+        for rank, i in enumerate(np.argsort(dense)[::-1][:200]):
+            rrf[int(i)] = rrf.get(int(i), 0.0) + 1.0 / (k + rank)
+        for rank, i in enumerate(np.argsort(bm25)[::-1][:200]):
+            rrf[int(i)] = rrf.get(int(i), 0.0) + 1.0 / (k + rank)
+        order = sorted(rrf.keys(), key=lambda i: -rrf[i])
+        return np.asarray(order, dtype=np.int64)
 
     def search(
         self,
@@ -124,7 +170,10 @@ class Retriever:
         candidate_k = max(
             settings.get_int("CANDIDATE_K", config.CANDIDATE_K), top_k
         )
-        order = np.argsort(scores)[::-1]
+        if query_text:
+            order = self._fused_order(scores, query_text)  # 混合检索：dense + BM25
+        else:
+            order = np.argsort(scores)[::-1]
         order = order[: len(self._chunk_ids)]
         if order.size == 0:
             return []
@@ -147,7 +196,9 @@ class Retriever:
                     continue
             score = float(scores[i])
             if score < 0.1:
-                break
+                if query_text:
+                    continue  # 融合顺序非单调：跳过低 dense 片段继续
+                break  # 纯 dense 顺序单调递减：低分即止
             if multi_doc and per_doc_count.get(d, 0) >= per_doc_cap:
                 continue
             selected.append(

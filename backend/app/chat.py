@@ -165,6 +165,72 @@ def _no_context_answer(reason: str) -> str:
     return f"根据提供的文档，{reason}无法回答这个问题。"
 
 
+# 长对话滚动记忆：近 _RECENT_TURNS 轮保留原文，更早的压缩成摘要，既不爆上下文也不断片
+_RECENT_TURNS = 8
+
+
+def _summarize_history(history: list[dict]) -> str:
+    """把较早的对话历史压缩成 2~4 句中文摘要（只保留关键问题与结论）。"""
+    lines = "\n".join(
+        f"{'用户' if h['role'] == 'user' else '助手'}: {h['content'][:200]}"
+        for h in history
+    )
+    try:
+        resp = _get_client().chat.completions.create(
+            model=chat_model(),
+            messages=[
+                {
+                    "role": "system",
+                    "content": "把这段对话历史压缩成 2~4 句中文摘要，只保留关键问题与结论，不要新增内容。",
+                },
+                {"role": "user", "content": lines},
+            ],
+            temperature=0,
+            max_tokens=200,
+        )
+        return (resp.choices[0].message.content or "").strip()
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def _llm_rerank(question: str, chunks: list[dict]) -> list[dict]:
+    """用 LLM 按语义相关性对候选片段重排（LLM-as-reranker）。
+
+    替代弱词法重排：让模型读「问题 + 片段」判断相关性。云端 API 下 token 便宜，
+    这是提升「准确基于文章」最有效的一笔。失败时原样返回（回退既有顺序）。
+    """
+    if len(chunks) <= 1:
+        return chunks
+    listing = "\n".join(f"[{i}] {c['text'][:400]}" for i, c in enumerate(chunks))
+    prompt = (
+        "下面有一道问题，以及若干文档片段。请判断每个片段与问题的相关性，"
+        "只输出相关性从高到低的片段编号，用逗号分隔（如 3,1,5,2,4），"
+        "不要输出任何解释或多余文字。\n\n"
+        f"问题：{question}\n\n片段：\n{listing}"
+    )
+    try:
+        resp = _get_client().chat.completions.create(
+            model=chat_model(),
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0,
+            max_tokens=64,
+        )
+        text = (resp.choices[0].message.content or "").strip()
+        order = [int(x) for x in re.findall(r"\d+", text)]
+    except Exception:  # noqa: BLE001
+        return chunks
+    seen: set[int] = set()
+    ranked: list[dict] = []
+    for i in order:
+        if 0 <= i < len(chunks) and i not in seen:
+            seen.add(i)
+            ranked.append(chunks[i])
+    for i, c in enumerate(chunks):
+        if i not in seen:
+            ranked.append(c)
+    return ranked
+
+
 def _meta_answer():
     """寒暄/问助手功能：友好回应并列出库内文档。"""
     from . import db
@@ -320,13 +386,20 @@ def answer_stream(
                 f"请用它把内容讲具体、讲出这一章的独特之处，别套通用模板。）"
             )
 
+    top_k = settings.get_int("TOP_K", config.TOP_K)
     results = retriever.search(
         vectors[0],
         query_text=rewritten,
         doc_id=scope_doc,
         doc_ids=doc_ids,
         page_range=scope_pages,
+        top_k=min(top_k * 3, 15),
     )
+    # 语义重排：候选 15 → LLM 按相关性排序 → 取前 top_k
+    if config.LLM_RERANK_ENABLED:
+        results = _llm_rerank(rewritten, results)[:top_k]
+    else:
+        results = results[:top_k]
     if not results:
         context = (
             "（本次没有检索到与问题直接相关的文档片段。"
@@ -338,9 +411,14 @@ def answer_stream(
         context = chapter_hint + "\n\n" + context
 
     chat_messages = [{"role": "system", "content": system_prompt}]
-    if history:
-        for h in history[-config.HISTORY_LIMIT :]:
-            chat_messages.append(h)
+    recent = history or []
+    if len(recent) > _RECENT_TURNS:
+        summary = _summarize_history(recent[:-_RECENT_TURNS])
+        if summary:
+            chat_messages.append({"role": "system", "content": f"（此前对话摘要：{summary}）"})
+        recent = recent[-_RECENT_TURNS:]
+    for h in recent:
+        chat_messages.append(h)
     chat_messages.append(
         {"role": "user", "content": f"源材料：\n{context}\n\n问题：{rewritten}"}
     )

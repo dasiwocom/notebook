@@ -253,8 +253,8 @@ const AssistantCard = memo(function AssistantCard({
                       <li
                         key={c.chunk_id}
                         onClick={() => onCite(m.id, i)}
-                        title="Click to locate the source"
-                        className="group cursor-pointer flex items-start gap-2.5 rounded-xl px-3 py-2 text-xs transition-colors hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"
+                        title={c.verified === false ? "This source may not match the claim" : "Click to locate the source"}
+                        className={`group cursor-pointer flex items-start gap-2.5 rounded-xl px-3 py-2 text-xs transition-colors hover:bg-black/[0.03] dark:hover:bg-white/[0.04] ${c.verified === false ? "opacity-55" : ""}`}
                       >
                         <span className="mt-px inline-flex w-4 shrink-0 items-center justify-center text-[11px] font-semibold tabular-nums text-zinc-400">
                           {i + 1}
