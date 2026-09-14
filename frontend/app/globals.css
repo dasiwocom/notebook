@@ -1,0 +1,255 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --background: #edeffa;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --speed-1: 120ms;
+  --speed-2: 260ms;
+  --speed-3: 420ms;
+  --shadow-btn: #ebebeb;
+  --shadow-soft: #f9f9f9;
+  --shadow-strong: #ebebeb;
+  --foreground: #1c1c1e;
+  --card: #ffffff;
+  --hairline: rgba(20, 20, 22, 0.08);
+  --hairline-strong: rgba(20, 20, 22, 0.16);
+}
+
+.dark {
+  --background: #1a1d22;
+  --foreground: #ececed;
+  --card: #22262b;
+  --hairline: rgba(255, 255, 255, 0.1);
+  --hairline-strong: rgba(255, 255, 255, 0.18);
+  --shadow-btn: #33373b;
+  --shadow-soft: #22262b;
+  --shadow-strong: #1f2327;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: -apple-system, "SF Pro Text", ui-sans-serif, system-ui,
+    "Noto Sans CJK SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
+    sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-feature-settings: "kern", "liga";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: rgba(47, 111, 235, 0.18);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.16) transparent;
+}
+
+.dark * {
+  scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+}
+
+/* 日夜切换统一过渡：transition 不继承，必须覆盖到所有换色元素，否则按钮淡变/面板瞬变会闪屏 */
+*,
+*::before,
+*::after {
+  transition:
+    background-color 0.25s var(--ease-out),
+    color 0.25s var(--ease-out),
+    border-color 0.25s var(--ease-out);
+}
+
+/* SVG 图标按钮重绘一帧闪屏：强制图标独立合成层（宿主用按钮，别加在有形变的 SVG 上） */
+button svg,
+a svg,
+button svg *,
+a svg * {
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+button:has(svg),
+a:has(svg) {
+  transform: translateZ(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+.card {
+  border-radius: 20px;
+  background: var(--card);
+  box-shadow:
+    0 1px 2px var(--shadow-soft),
+    0 6px 18px -8px var(--shadow-strong);
+}
+
+.dark .card {
+  box-shadow:
+    0 1px 2px var(--shadow-soft),
+    0 10px 28px -16px var(--shadow-strong);
+}
+
+/* Studio 工具框：亮/暗色都用同样的彩色浅底 */
+.toolbox {
+  background-color: var(--tool-bg);
+}
+.toolbox.toolbox-muted {
+  background-color: #ebebeb;
+}
+/* 未选中文档时：工具框退回面板底色（亮色 #ebebeb，暗色 #1f2327） */
+.dark .toolbox.toolbox-muted {
+  background-color: #1f2327;
+}
+
+.dragging,
+.dragging * {
+  cursor: col-resize !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+/* ---------- 动效层 ---------- */
+
+/* 入场：上浮 + 淡入（此前代码里引用了 animate-rise 但从未定义，等于没动画） */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-rise {
+  animation: rise var(--speed-3) var(--ease-out) both;
+}
+
+/* 思考 orb：旋转的 conic 渐变 + 外溢光晕 + 白色核 + 脉冲环 */
+.orb {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  border-radius: 9999px;
+  background: conic-gradient(from 180deg, #4f7cff, #22d3ee, #a78bfa, #4f7cff);
+  animation: orb-spin 2.2s linear infinite;
+}
+.orb::before {
+  content: "";
+  position: absolute;
+  inset: -7px;
+  border-radius: 9999px;
+  background: inherit;
+  filter: blur(12px);
+  opacity: 0.5;
+  animation: orb-breathe 2.2s ease-in-out infinite;
+}
+.orb::after {
+  content: "";
+  position: absolute;
+  inset: 7px;
+  border-radius: 9999px;
+  background: #fff;
+}
+.orb-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  border: 1.5px solid rgba(79, 124, 255, 0.55);
+  animation: orb-ring 1.9s var(--ease-out) infinite;
+}
+@keyframes orb-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes orb-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.25);
+    opacity: 0.9;
+  }
+}
+@keyframes orb-ring {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+/* 按钮按压反馈 */
+.press:active {
+  transform: scale(0.96);
+}
+
+/* ---------- 手机端折叠 ---------- */
+/* 窄屏下三栏收起为底部三个 Tab：默认隐藏，仅展示当前 Tab 对应的栏 */
+.mb-view {
+  display: none;
+}
+[data-mb="docs"] .mb-doc,
+[data-mb="chat"] .mb-chat,
+[data-mb="tools"] .mb-tools {
+  display: flex;
+}
+@media (min-width: 1200px) {
+  .mb-view {
+    display: flex;
+  }
+  .mb-nav {
+    background: var(--card);
+  }
+}
+@media (max-width: 1199px) {
+  .mb-layout {
+    gap: 0 !important;
+    padding: 0 !important;
+  }
+  .mb-doc,
+  .mb-chat,
+  .mb-tools,
+  .mb-nav {
+    width: 100% !important;
+    max-width: 100%;
+    border-radius: 0 !important;
+    background: var(--card) !important;
+    box-shadow: none !important;
+  }
+  .mb-head {
+    display: none !important;
+  }
+}

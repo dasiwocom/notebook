@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+openai
+numpy
+python-dotenv
+python-multipart
+fastembed
+onnxruntime

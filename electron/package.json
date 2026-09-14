@@ -1,0 +1,64 @@
+{
+  "name": "notebook-desktop",
+  "productName": "notebook",
+  "version": "1.0.0",
+  "description": "NotebookLM 风格的学习助手桌面版",
+  "main": "main.cjs",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist:linux": "electron-builder --linux AppImage deb",
+    "dist:win": "electron-builder --win portable",
+    "dist:mac": "electron-builder --mac dmg",
+    "dist": "electron-builder --linux AppImage"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.notebook.app",
+    "productName": "notebook",
+    "files": ["main.cjs", "preload.cjs"],
+    "directories": { "output": "dist" },
+    "asar": false,
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "category": "Education"
+    },
+    "win": {
+      "target": ["portable"]
+    },
+    "mac": {
+      "target": ["dmg"],
+      "category": "public.app-category.education"
+    },
+    "extraResources": [
+      {
+        "from": "../backend",
+        "to": "backend",
+        "filter": [
+          "app/**/*.py",
+          "requirements.txt",
+          "data/tocs.json"
+        ]
+      },
+      {
+        "from": "../backend/.venv",
+        "to": "backend/.venv"
+      },
+      {
+        "from": "../frontend/.next/standalone",
+        "to": "frontend"
+      },
+      {
+        "from": "tools/node",
+        "to": "bin/node"
+      },
+      {
+        "from": "tools/node.exe",
+        "to": "bin/node.exe"
+      }
+    ]
+  }
+}
