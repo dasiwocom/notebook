@@ -57,6 +57,7 @@ class ChatRequest(BaseModel):
     history: list[dict] | None = None
     doc_id: str | None = None
     doc_ids: list[str] | None = None
+    op: str | None = None
 
 
 class RenameRequest(BaseModel):
@@ -66,6 +67,21 @@ class RenameRequest(BaseModel):
 @app.get("/api/health")
 def health() -> dict:
     return {"status": "ok"}
+
+
+@app.get("/api/stats")
+def stats() -> dict:
+    """诊断信息：文档/块/会话数量与状态分布，便于排查检索质量。"""
+    docs = db.list_documents()
+    return {
+        "documents": len(docs),
+        "ready": sum(1 for d in docs if d["status"] == "ready"),
+        "processing": sum(1 for d in docs if d["status"] == "processing"),
+        "error": sum(1 for d in docs if d["status"] == "error"),
+        "chunks": sum(d["chunk_count"] for d in docs),
+        "indexed_chunks": sum(d["indexed_chunks"] for d in docs),
+        "conversations": len(db.list_conversations()),
+    }
 
 
 @app.get("/api/documents")
@@ -331,7 +347,7 @@ async def chat_with_sources(req: ChatRequest):
 
     async def ndjson_stream() -> AsyncIterator[str]:
         for event in chat.answer_stream(
-            message, history=req.history, doc_id=req.doc_id, doc_ids=req.doc_ids
+            message, history=req.history, doc_id=req.doc_id, doc_ids=req.doc_ids, op=req.op
         ):
             yield json.dumps(event, ensure_ascii=False) + "\n"
 

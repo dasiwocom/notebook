@@ -27,6 +27,7 @@ import { chatStream, createNote, deleteNote, listNotes, listStudies, syncStudies
 
 type Tool = {
   label: string;
+  op: string;
   prompt: string;
   icon: typeof Zap;
   color: string;
@@ -35,30 +36,35 @@ type Tool = {
 const TOOLS: Tool[] = [
   {
     label: "Fast Track",
+    op: "study_plan",
     prompt: "Give me a crash course on this subject, section by section",
     icon: Zap,
     color: "#edeffa",
   },
   {
     label: "Key Points",
+    op: "key_points",
     prompt: "Highlight the key points of this course for me",
     icon: ListChecks,
     color: "#f2f2e8",
   },
   {
     label: "Mind Map",
+    op: "mind_map",
     prompt: "思维导图",
     icon: Brain,
     color: "#e8f0fe",
   },
   {
     label: "Quiz",
+    op: "quiz",
     prompt: "选择题",
     icon: CircleCheck,
     color: "#e1f5e4",
   },
   {
     label: "Chapters",
+    op: "chapters",
     prompt: "List the chapter structure of this book",
     icon: List,
     color: "#f0e9ef",
@@ -402,6 +408,7 @@ export function ToolsPanel({
           history: [],
           doc_id: null,
           doc_ids: ids,
+          op: t.op,
           signal: ctrl.signal,
           onEvent: (ev) => {
             if (ev.type === "delta") {

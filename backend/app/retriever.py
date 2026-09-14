@@ -119,10 +119,17 @@ class Retriever:
         if order.size == 0:
             return []
 
+        # 多文档时每文档限流：避免某本大书在候选阶段吃掉全部名额，
+        # 导致 MMR 重排只能在单一文档内做、无法跨文档平衡。
+        multi_doc = doc_filter is not None and len(doc_filter) > 1
+        per_doc_cap = max(top_k, candidate_k // len(doc_filter)) if multi_doc else 0
+        per_doc_count: dict[str, int] = {}
+
         selected = []
         for i in order:
             i = int(i)
-            if doc_filter is not None and self._doc_ids[i] not in doc_filter:
+            d = self._doc_ids[i]
+            if doc_filter is not None and d not in doc_filter:
                 continue
             if page_range is not None:
                 pg = _page_of(self._paths[i])
@@ -131,6 +138,8 @@ class Retriever:
             score = float(scores[i])
             if score < 0.1:
                 break
+            if multi_doc and per_doc_count.get(d, 0) >= per_doc_cap:
+                continue
             selected.append(
                 {
                     "score": score,
@@ -141,6 +150,7 @@ class Retriever:
                     "text": self._texts[i],
                 }
             )
+            per_doc_count[d] = per_doc_count.get(d, 0) + 1
             if len(selected) >= candidate_k:
                 break
 

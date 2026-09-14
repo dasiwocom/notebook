@@ -12,7 +12,9 @@ function apply(mode: Mode) {
 function readMode(): Mode {
   if (typeof window === "undefined") return "light";
   const saved = localStorage.getItem("theme");
-  return saved === "dark" ? "dark" : "light";
+  if (saved === "dark" || saved === "light") return saved;
+  // 无保存偏好时跟随系统，与 layout.tsx 内联脚本的预置逻辑一致，避免首屏闪烁
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
 export function ThemeToggle() {

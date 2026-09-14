@@ -135,6 +135,7 @@ export type ChatStreamOptions = {
   history: HistoryMessage[];
   doc_id: string | null;
   doc_ids?: string[] | null;
+  op?: string | null;
   signal?: AbortSignal;
   onEvent: (ev: ChatStreamEvent) => void;
 };
@@ -150,6 +151,7 @@ export async function chatStream(
       history: opts.history,
       doc_id: opts.doc_id,
       doc_ids: opts.doc_ids ?? null,
+      op: opts.op ?? null,
     }),
     signal: opts.signal,
   });

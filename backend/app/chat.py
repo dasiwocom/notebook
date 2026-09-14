@@ -248,6 +248,7 @@ def answer_stream(
     history: list[dict] | None = None,
     doc_id: str | None = None,
     doc_ids: list[str] | None = None,
+    op: str | None = None,
 ):
     """Yields dicts serialised as JSON lines (NDJSON)."""
     no_key = not has_llm_key()
@@ -263,6 +264,11 @@ def answer_stream(
     effective_doc = doc_ids[0] if doc_ids and len(doc_ids) == 1 else None
 
     from . import study
+
+    # 前端 Studio 工具传入显式 op 时直接路由，结果稳定，不依赖正则/意图判断。
+    if op in study.STUDY_OPS:
+        yield from study.answer_study_stream(op, message, doc_id=effective_doc)
+        return
 
     study_op = study.detect_op(message)
     if study_op:
