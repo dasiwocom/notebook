@@ -26,7 +26,7 @@ TOP_K = int(os.getenv("TOP_K", "5"))
 CANDIDATE_K = int(os.getenv("CANDIDATE_K", "20"))
 MMR_LAMBDA = float(os.getenv("MMR_LAMBDA", "0.7"))
 RERANKER_MODEL = os.getenv("RERANKER_MODEL", "BAAI/bge-reranker-base")
-HISTORY_LIMIT = int(os.getenv("HISTORY_LIMIT", "6"))
+HISTORY_LIMIT = int(os.getenv("HISTORY_LIMIT", "12"))
 
 DB_PATH = os.getenv("DB_PATH") or str(_BASE_DIR / "data" / "app.db")
 PORT = int(os.getenv("PORT", "8000"))

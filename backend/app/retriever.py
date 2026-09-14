@@ -8,12 +8,14 @@ from .reranker import reranker
 
 
 def _lexical_fuzzy(q: str, passages: list[str]) -> list[float]:
-    """Char bigram overlap similarity — cheap heuristic used as a fallback
-    rerank when the cross-encoder is not available. Values in [0, 1]."""
+    """字符 bigram 的 F1 相似度 —— cross-encoder 不可用时的回退重排。
+
+    同时考虑「查询词覆盖」（召回）与「命中密度」（精确），比单纯覆盖率更稳，
+    避免长段落因碰巧含更多查询字而被高估。
+    """
 
     def grams(text: str) -> set[str]:
-        s = text.lower()
-        chars = [c for c in s if not c.isspace()]
+        chars = [c for c in text.lower() if not c.isspace()]
         return {
             "".join(chars[i : i + 2])
             for i in range(max(0, len(chars) - 1))
@@ -22,9 +24,17 @@ def _lexical_fuzzy(q: str, passages: list[str]) -> list[float]:
     qg = grams(q)
     if not qg:
         return [0.0] * len(passages)
-    return [
-        len(qg & grams(p)) / len(qg) if grams(p) else 0.0 for p in passages
-    ]
+    out: list[float] = []
+    for p in passages:
+        pg = grams(p)
+        if not pg:
+            out.append(0.0)
+            continue
+        inter = len(qg & pg)
+        prec = inter / len(pg)
+        rec = inter / len(qg)
+        out.append(2 * prec * rec / (prec + rec) if (prec + rec) > 0 else 0.0)
+    return out
 
 
 _PAGE_RE = re.compile(r"第\s*(\d+)\s*页")
