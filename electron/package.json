@@ -5,6 +5,11 @@
   "description": "NotebookLM 风格的学习助手桌面版",
   "main": "main.cjs",
   "private": true,
+  "homepage": "https://github.com/AiMac Dmitry/notebook",
+  "author": {
+    "name": "AiMac Dmitry",
+    "email": "aimac.dmitry@yandex.ru"
+  },
   "scripts": {
     "start": "electron .",
     "dist:linux": "electron-builder --linux AppImage deb",
@@ -20,18 +25,24 @@
     "appId": "com.notebook.app",
     "productName": "notebook",
     "files": ["main.cjs", "preload.cjs"],
-    "directories": { "output": "dist" },
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
     "asar": false,
     "linux": {
       "target": ["AppImage", "deb"],
-      "category": "Education"
+      "category": "Education",
+      "icon": "build/icon.png"
     },
     "win": {
-      "target": ["portable"]
+      "target": ["portable"],
+      "icon": "build/icon.png"
     },
     "mac": {
       "target": ["dmg"],
-      "category": "public.app-category.education"
+      "category": "public.app-category.education",
+      "icon": "build/icon.png"
     },
     "extraResources": [
       {
@@ -44,8 +55,14 @@
         ]
       },
       {
-        "from": "../backend/.venv",
-        "to": "backend/.venv"
+        "from": "tools/python",
+        "to": "python",
+        "filter": ["**/*", "!**/__pycache__/**", "!**/*.pyc"]
+      },
+      {
+        "from": "tools/pydeps",
+        "to": "python/pydeps",
+        "filter": ["**/*", "!**/__pycache__/**", "!**/*.pyc"]
       },
       {
         "from": "../frontend/.next/standalone",

@@ -125,6 +125,14 @@ function venvPython(venvDir) {
   return path.join(venvDir, IS_WIN ? "Scripts" : "bin", IS_WIN ? "python.exe" : "python");
 }
 
+// 捆绑的便携 Python（python-build-standalone）：解压后结构 python/bin/python3，
+// 依赖装在 python/pydeps，是 linux 打包的默认后端运行时，完全自包含。
+function portablePython() {
+  const base = path.join(ROOT, "python");
+  const py = path.join(base, "bin", "python3");
+  return fs.existsSync(py) ? { py, pydeps: path.join(base, "pydeps") } : null;
+}
+
 function findSystemPython() {
   const candidates = IS_WIN ? ["python", "py"] : ["python3.13", "python3", "python"];
   for (const c of candidates) {
@@ -172,12 +180,46 @@ function runStep(cmd, args, label) {
   });
 }
 
+function venvUsable(py) {
+  // 真枪实弹自检：捆绑 venv 是复制自打包机，pyvenv.cfg 写死了打包机的
+  // 解释器路径（home=/usr/bin, executable=.../python3.13）。在目标机
+  // Python 版本不一致时，光存在 python 不算数——必须能实际 import 后端
+  // 全模块链才算可用。模型加载都是惰性的，import 不会触发联网/大模型。
+  try {
+    const r = spawnSync(py, ["-c", "import app.main"], {
+      cwd: BACKEND_DIR,
+      env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" },
+      windowsHide: true,
+      timeout: 60000,
+    });
+    if (r.error || r.status !== 0) {
+      log(`venv health check FAILED: ${py}`);
+      const msg = (r.stderr ? String(r.stderr) : "").trim();
+      if (msg) log(`  stderr: ${msg.split("\n").slice(-3).join(" | ")}`);
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function resolveBackend() {
-  // 1) 捆绑的 venv（Linux 打包自带）
+  // 0) 捆绑的便携 Python（linux 打包自带）：最优先，完全自包含
+  const portable = portablePython();
+  if (portable) {
+    log(`using bundled portable python: ${portable.py}`);
+    return { python: portable.py, pydeps: portable.pydeps };
+  }
+  // 1) 捆绑的 venv（旧 linux 包兼容）：通过了健康检测才用
   const bundled = venvPython(path.join(BACKEND_DIR, ".venv"));
-  if (fs.existsSync(bundled)) return bundled;
-  // 2) 用户目录 venv（首次运行自动创建）
-  return await bootstrapVenv();
+  if (fs.existsSync(bundled) && venvUsable(bundled)) {
+    log(`using bundled venv: ${bundled}`);
+    return { python: bundled, pydeps: null };
+  }
+  // 2) 用户目录 venv（首次运行自动创建，win/mac 及无捆绑包时）
+  const bootstrapped = await bootstrapVenv();
+  return { python: bootstrapped, pydeps: null };
 }
 
 function backendEnvVars(port) {
@@ -220,10 +262,13 @@ function resolveNode() {
   return null;
 }
 
-async function startBackend(python, port) {
+async function startBackend(python, pydeps, port) {
+  const env = backendEnvVars(port);
+  // 便携 Python 的依赖目录经 PYTHONPATH 注入；venv 模式无需
+  if (pydeps) env.PYTHONPATH = pydeps;
   const child = await startChild(python, ["-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", String(port)], {
     cwd: BACKEND_DIR,
-    env: backendEnvVars(port),
+    env,
     name: "backend",
   });
   log(`waiting backend on ${port}`);
@@ -247,12 +292,12 @@ async function startFrontend(node, port) {
 async function boot() {
   const backendPort = await findFreePort();
   const frontendPort = await findFreePort();
-  const python = await resolveBackend();
+  const { python, pydeps } = await resolveBackend();
   const node = resolveNode();
   if (!node) throw new Error("找不到可用的 node，无法启动前端服务");
-  log(`ports backend=${backendPort} frontend=${frontendPort} python=${python} node=${node}`);
+  log(`ports backend=${backendPort} frontend=${frontendPort} python=${python} node=${node} pydeps=${pydeps || "-"}`);
 
-  const BE = await startBackend(python, backendPort);
+  const BE = await startBackend(python, pydeps, backendPort);
   const FE = await startFrontend(node, frontendPort);
   writeState({ backendPort, frontendPort });
 
