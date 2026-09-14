@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { memo, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
@@ -106,6 +106,8 @@ function AnswerBody({
   content: string;
   onCite: (n: number) => void;
 }) {
+  const markdown = useMemo(() => toCiteMarkdown(content), [content]);
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const components = {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -143,13 +145,13 @@ function AnswerBody({
       dark:prose-blockquote:border-zinc-700 dark:prose-blockquote:text-zinc-400
       dark:prose-hr:border-white/10 dark:prose-th:text-zinc-200">
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
-        {toCiteMarkdown(content)}
+        {markdown}
       </ReactMarkdown>
     </div>
   );
 }
 
-function AssistantCard({
+const AssistantCard = memo(function AssistantCard({
   m,
   onCite,
   onSend,
@@ -162,6 +164,9 @@ function AssistantCard({
 }) {
   const [openSources, setOpenSources] = useState(false);
   const [copied, setCopied] = useState(false);
+  // 流式期间 content 每 token 都在变；用 useDeferredValue 把昂贵的 Markdown
+  // 渲染降为低优先级，让打字/滚动保持流畅（React 会在负载下合并渲染）。
+  const deferredContent = useDeferredValue(m.content);
 
   const copy = async () => {
     try {
@@ -208,7 +213,7 @@ function AssistantCard({
               </span>
             ) : (
               <AnswerBody
-                content={m.content}
+                content={deferredContent}
                 onCite={(n) => onCite(m.id, n)}
               />
             )}
@@ -299,7 +304,7 @@ function AssistantCard({
       )}
     </div>
   );
-}
+});
 
 export function ChatPanel({
   messages,
@@ -334,10 +339,13 @@ export function ChatPanel({
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    scrollRef.current?.scrollTo({
-      top: scrollRef.current.scrollHeight,
-      behavior: "smooth",
-    });
+    const el = scrollRef.current;
+    if (!el) return;
+    // 只有用户本来就在底部时才自动跟随；流式期间用 instant 避免平滑滚动排队。
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    if (nearBottom) {
+      el.scrollTo({ top: el.scrollHeight, behavior: "auto" });
+    }
   }, [messages, loading]);
 
   const submit = () => {
@@ -503,7 +511,7 @@ export function ChatPanel({
                 m={m}
                 onCite={onCite}
                 onSend={onSend}
-                onRetry={(t) => onSend(t)}
+                onRetry={onSend}
               />
             )
           )}

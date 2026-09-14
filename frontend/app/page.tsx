@@ -228,7 +228,7 @@ export default function Home() {
       return Number.isFinite(n) ? Math.max(acc, n) : acc;
     }, 0);
     idRef.current = maxId;
-  }, []);
+  }, [messages]);
 
   useEffect(() => {
     messagesRef.current = messages;

@@ -17,7 +17,6 @@ import {
   Loader2,
   PanelRight,
   PenLine,
-  Plus,
   Save,
   Square,
   Trash2,
@@ -271,6 +270,7 @@ export function ToolsPanel({
   const [notes, setNotes] = useState<Note[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
+  const [collapsedNotes, setCollapsedNotes] = useState<Set<string>>(new Set());
   const abortRef = useRef<Map<string, AbortController>>(new Map());
   const scrollRef = useRef<HTMLDivElement>(null);
   const outputsRef = useRef<Output[]>([]);
@@ -450,6 +450,15 @@ export function ToolsPanel({
     );
   }, []);
 
+  const toggleNote = useCallback((id: string) => {
+    setCollapsedNotes((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
   /* ── note actions ───────────────────────────────────────────────── */
 
   const create = async () => {
@@ -542,6 +551,19 @@ export function ToolsPanel({
               <ChevronRight className="h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform group-hover:translate-x-0.5" strokeWidth={2} />
             </button>
           ))}
+          <button
+            onClick={create}
+            disabled={!docId}
+            title="新建笔记（需先勾选一份文档）"
+            style={{ "--tool-bg": NOTE_COLOR } as CSSProperties}
+            className={`toolbox group flex items-center gap-2.5 rounded-[14px] px-3 py-4 text-left transition-all disabled:opacity-40 ${docId ? "" : "toolbox-muted"}`}
+          >
+            <PenLine className="h-4 w-4 shrink-0 text-zinc-700" strokeWidth={2} />
+            <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-zinc-700">
+              Note
+            </span>
+            <ChevronRight className="h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform group-hover:translate-x-0.5" strokeWidth={2} />
+          </button>
         </div>
       </div>
 
@@ -551,16 +573,6 @@ export function ToolsPanel({
             <span className="text-[12px] font-medium tracking-wide text-zinc-400 dark:text-zinc-500">
               产出 · Outputs
             </span>
-            {docId && (
-              <button
-                onClick={create}
-                className="flex items-center gap-1 rounded-lg border border-black/[0.06] px-2 py-1 text-[11px] font-medium text-zinc-500 transition-colors hover:border-[#0b57d0] hover:text-[#0b57d0] dark:border-white/10 dark:text-zinc-400 dark:hover:border-[#a8c7fa] dark:hover:text-[#a8c7fa]"
-                title="新建笔记"
-              >
-                <Plus className="h-3 w-3" strokeWidth={2} />
-                笔记
-              </button>
-            )}
           </div>
 
           {items.length === 0 ? (
@@ -586,12 +598,19 @@ export function ToolsPanel({
                   <NoteCard
                     key={it.n.id}
                     n={it.n}
+                    expanded={!collapsedNotes.has(it.n.id)}
                     editing={editingId === it.n.id}
                     draft={draft}
+                    onToggle={() => toggleNote(it.n.id)}
                     onDraft={setDraft}
                     onStartEdit={() => {
                       setEditingId(it.n.id);
                       setDraft(it.n.content);
+                      setCollapsedNotes((prev) => {
+                        const next = new Set(prev);
+                        next.delete(it.n.id);
+                        return next;
+                      });
                     }}
                     onCancelEdit={() => setEditingId(null)}
                     onSave={() => save(it.n.id)}
@@ -720,8 +739,10 @@ function OutputCard({
 
 function NoteCard({
   n,
+  expanded,
   editing,
   draft,
+  onToggle,
   onDraft,
   onStartEdit,
   onCancelEdit,
@@ -729,18 +750,25 @@ function NoteCard({
   onRemove,
 }: {
   n: Note;
+  expanded: boolean;
   editing: boolean;
   draft: string;
+  onToggle: () => void;
   onDraft: (v: string) => void;
   onStartEdit: () => void;
   onCancelEdit: () => void;
   onSave: () => void;
   onRemove: () => void;
 }) {
+  const showBody = expanded || editing;
   return (
     <div className="animate-rise group overflow-hidden rounded-[14px] border border-black/[0.05] bg-white shadow-sm dark:border-white/10 dark:bg-[#1f2327]">
       <div className="flex items-center gap-2 px-3 py-2">
-        <div className="flex min-w-0 flex-1 items-center gap-2 text-left">
+        <button
+          onClick={onToggle}
+          className="flex min-w-0 flex-1 items-center gap-2 text-left"
+          title={expanded ? "Collapse" : "Expand"}
+        >
           <span
             className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg"
             style={{ backgroundColor: NOTE_COLOR }}
@@ -750,7 +778,11 @@ function NoteCard({
           <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-zinc-700 dark:text-zinc-200">
             笔记
           </span>
-        </div>
+          <ChevronDown
+            className={`h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform ${expanded ? "" : "-rotate-90"}`}
+            strokeWidth={2}
+          />
+        </button>
         {!editing && (
           <>
             <button
@@ -770,42 +802,44 @@ function NoteCard({
           </>
         )}
       </div>
-      <div className="border-t border-black/[0.04] px-4 py-3 dark:border-white/5">
-        {editing ? (
-          <>
-            <textarea
-              value={draft}
-              onChange={(e) => onDraft(e.target.value)}
-              className="w-full resize-none rounded-lg border border-black/[0.08] bg-[#fbfbfd] px-2.5 py-2 text-[13px] leading-6 text-zinc-800 focus:outline-none focus:ring-1 focus:ring-[#0b57d0] dark:border-white/10 dark:bg-[#1a1d22] dark:text-zinc-200 dark:focus:ring-[#a8c7fa]"
-              rows={4}
-              autoFocus
-              placeholder="写点什么…"
-            />
-            <div className="mt-1.5 flex justify-end gap-1.5">
-              <button
-                onClick={onCancelEdit}
-                className="rounded-lg px-2.5 py-1 text-[12px] text-zinc-500 hover:bg-black/[0.05] dark:hover:bg-white/[0.08]"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={onSave}
-                className="rounded-lg bg-[#0b57d0] px-3 py-1 text-[12px] font-medium text-white hover:bg-[#0a4fc4] dark:bg-[#a8c7fa] dark:text-[#1a1d22] dark:hover:bg-[#93b8e8]"
-              >
-                Save
-              </button>
-            </div>
-          </>
-        ) : (
-          <p className="whitespace-pre-wrap text-[13px] leading-6 text-zinc-700 dark:text-zinc-300">
-            {n.content || (
-              <span className="italic text-zinc-400 dark:text-zinc-500">
-                Empty note
-              </span>
-            )}
-          </p>
-        )}
-      </div>
+      {showBody && (
+        <div className="border-t border-black/[0.04] px-4 py-3 dark:border-white/5">
+          {editing ? (
+            <>
+              <textarea
+                value={draft}
+                onChange={(e) => onDraft(e.target.value)}
+                className="w-full resize-none rounded-lg border border-black/[0.08] bg-[#fbfbfd] px-2.5 py-2 text-[13px] leading-6 text-zinc-800 focus:outline-none focus:ring-1 focus:ring-[#0b57d0] dark:border-white/10 dark:bg-[#1a1d22] dark:text-zinc-200 dark:focus:ring-[#a8c7fa]"
+                rows={4}
+                autoFocus
+                placeholder="写点什么…"
+              />
+              <div className="mt-1.5 flex justify-end gap-1.5">
+                <button
+                  onClick={onCancelEdit}
+                  className="rounded-lg px-2.5 py-1 text-[12px] text-zinc-500 hover:bg-black/[0.05] dark:hover:bg-white/[0.08]"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={onSave}
+                  className="rounded-lg bg-[#0b57d0] px-3 py-1 text-[12px] font-medium text-white hover:bg-[#0a4fc4] dark:bg-[#a8c7fa] dark:text-[#1a1d22] dark:hover:bg-[#93b8e8]"
+                >
+                  Save
+                </button>
+              </div>
+            </>
+          ) : (
+            <p className="whitespace-pre-wrap text-[13px] leading-6 text-zinc-700 dark:text-zinc-300">
+              {n.content || (
+                <span className="italic text-zinc-400 dark:text-zinc-500">
+                  Empty note
+                </span>
+              )}
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }

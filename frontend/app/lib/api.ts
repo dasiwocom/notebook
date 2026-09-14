@@ -16,8 +16,22 @@ const API_BASE =
 
 export { API_BASE };
 
+const TOKEN =
+  typeof window === "undefined"
+    ? process.env.NEXT_PUBLIC_API_TOKEN
+    : (window as any).electronAPI?.token ?? process.env.NEXT_PUBLIC_API_TOKEN;
+
+function authHeaders(extra?: Record<string, string>): Record<string, string> {
+  const h: Record<string, string> = { ...(extra ?? {}) };
+  if (TOKEN) h["Authorization"] = `Bearer ${TOKEN}`;
+  return h;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, init);
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...init,
+    headers: authHeaders(init?.headers as Record<string, string> | undefined),
+  });
   const text = await res.text();
   const data = text ? JSON.parse(text) : null;
   if (!res.ok) {
@@ -39,6 +53,7 @@ export function uploadDocument(
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", `${API_BASE}/api/documents`);
+    if (TOKEN) xhr.setRequestHeader("Authorization", `Bearer ${TOKEN}`);
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable && onProgress) {
         onProgress(Math.round((e.loaded / e.total) * 100));
@@ -129,7 +144,7 @@ export async function chatStream(
 ): Promise<void> {
   const res = await fetch(`${API_BASE}/api/chat`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({
       message: opts.message,
       history: opts.history,
