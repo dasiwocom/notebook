@@ -18,8 +18,10 @@ OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "http://localhost:11434/v1")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "ollama")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "nomic-embed-text")
 
-CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "1500"))
-CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "200"))
+# bge-small-zh-v1.5 的 max_seq_length 约 512 token；中文约 1 字 1 token，
+# 因此 chunk 上限须远小于 1500，否则每块后半内容会被 fastembed 静默截断、检索不到。
+CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "500"))
+CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "100"))
 TOP_K = int(os.getenv("TOP_K", "5"))
 CANDIDATE_K = int(os.getenv("CANDIDATE_K", "20"))
 MMR_LAMBDA = float(os.getenv("MMR_LAMBDA", "0.7"))
@@ -28,6 +30,13 @@ HISTORY_LIMIT = int(os.getenv("HISTORY_LIMIT", "6"))
 
 DB_PATH = os.getenv("DB_PATH") or str(_BASE_DIR / "data" / "app.db")
 PORT = int(os.getenv("PORT", "8000"))
+
+# 上传文件大小上限（默认 100MB），防止大文件 OOM / 撑爆磁盘。
+MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_BYTES", str(100 * 1024 * 1024)))
+
+# 本地 API 访问令牌：设置后所有 /api 请求须带 Authorization: Bearer <token>。
+# Electron 桌面版启动时自动生成随机 token 注入；纯 Web 部署请自行在 .env 配置。
+NOTEBOOK_TOKEN = os.getenv("NOTEBOOK_TOKEN", "")
 
 PDF_DATA_DIR = Path(os.getenv("PDF_DATA_DIR") or str(_BASE_DIR / "data" / "pdf"))
 PDF_PAGES_DIR = Path(os.getenv("PDF_PAGES_DIR") or str(_BASE_DIR / "data" / "pdfpages"))

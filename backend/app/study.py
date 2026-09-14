@@ -22,11 +22,12 @@ _CN_CHAPTER_RE = re.compile(r"第\s*([一二三四五六七八九十]{1,3})\s*[�
 
 
 def _cn_to_int(s: str) -> int:
+    """中文数字 → int：十=10、十五=15、二十=20、二十五=25、三十三=33。"""
     if "十" in s:
         left, right = s.split("十", 1)
-        tens = _CN_NUM.get(left) if left else 10
-        ones = _CN_NUM.get(right, 0)
-        return tens + ones if left else 10 + ones
+        # 十位在「十」左侧时为 数字×10（二十→20）；无左侧则为 10（十五→15）
+        tens = (_CN_NUM.get(left) or 0) * 10 if left else 10
+        return tens + _CN_NUM.get(right, 0)
     return _CN_NUM.get(s, 0)
 
 

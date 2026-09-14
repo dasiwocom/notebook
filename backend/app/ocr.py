@@ -137,7 +137,19 @@ def _ensure_pages(doc_id: str, count: int, progress=None) -> None:
     state_lock = threading.Lock()
 
     def run(n: int) -> None:
-        _do_page(doc_id, n)
+        try:
+            _do_page(doc_id, n)
+        except Exception:
+            # 单页失败不中断整本书：写空缓存占位，跳过该页继续。
+            try:
+                cache = _page_path(doc_id, n)
+                cache.parent.mkdir(parents=True, exist_ok=True)
+                cache.write_text(
+                    json.dumps({"text": "", "lines": []}, ensure_ascii=False),
+                    encoding="utf-8",
+                )
+            except Exception:
+                pass
         with state_lock:
             state["done"] += 1
             if progress:
@@ -147,12 +159,15 @@ def _ensure_pages(doc_id: str, count: int, progress=None) -> None:
         list(ex.map(run, missing))
 
 
-def extract_ocr(doc_id: str, progress=None) -> str:
+def extract_ocr(doc_id: str, progress=None, ocr_missing: bool = True) -> str:
     """OCR the whole PDF into markdown. Each page starts with '# 第 N 页',
     detected chapter/section headings become nested headers.
-    Missing pages are OCR'd in parallel (cached per page afterwards)."""
+    Missing pages are OCR'd in parallel (cached per page afterwards).
+    ocr_missing=False 时只读取已缓存页、不补齐缺页（供“部分索引”只嵌入已 OCR
+    的前几章，避免嵌套跑全书 OCR）。"""
     count = _page_count(doc_id)
-    _ensure_pages(doc_id, count, progress)
+    if ocr_missing:
+        _ensure_pages(doc_id, count, progress)
     parts: list[str] = []
     for n in range(1, count + 1):
         try:

@@ -8,20 +8,26 @@ from pathlib import Path
 from . import config
 
 _lock = threading.Lock()
-_conn = None
+_local = threading.local()
 
 
 def get_conn() -> sqlite3.Connection:
-    global _conn
-    if _conn is None:
+    """每线程一个连接：写操作仍由 _lock 串行化，读操作用本线程自己的连接。
+    配合 WAL 模式，后台重索引写库时主线程读不会报 database is locked。"""
+    conn = getattr(_local, "conn", None)
+    if conn is None:
         Path(config.DB_PATH).parent.mkdir(parents=True, exist_ok=True)
-        _conn = sqlite3.connect(config.DB_PATH, check_same_thread=False)
-        _conn.row_factory = sqlite3.Row
-        _init(_conn)
-    return _conn
+        conn = sqlite3.connect(config.DB_PATH, check_same_thread=False, timeout=30.0)
+        conn.row_factory = sqlite3.Row
+        _init(conn)
+        _local.conn = conn
+    return conn
 
 
 def _init(conn: sqlite3.Connection) -> None:
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=30000")
+    conn.execute("PRAGMA synchronous=NORMAL")
     conn.executescript(
         """
         CREATE TABLE IF NOT EXISTS documents (

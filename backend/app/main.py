@@ -5,7 +5,7 @@ from typing import AsyncIterator
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
 from . import chat, chunker, config, db, pdf, settings
@@ -20,6 +20,30 @@ def _startup() -> None:
     settings.ensure_file()
     db.reconcile_stale_statuses()
 
+class TokenAuthMiddleware:
+    """可选的本地 API 鉴权：设置 NOTEBOOK_TOKEN 后，所有 /api 请求须带
+    Authorization: Bearer <token>。用纯 ASGI 中间件（不包住响应体），
+    避免 BaseHTTPMiddleware 对 /api/chat 流式响应的影响。"""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http" and config.NOTEBOOK_TOKEN:
+            path = scope.get("path", "")
+            if path.startswith("/api") and path != "/api/health":
+                headers = dict(scope.get("headers", []))
+                auth = headers.get(b"authorization", b"").decode("latin-1")
+                if auth != f"Bearer {config.NOTEBOOK_TOKEN}":
+                    resp = JSONResponse({"detail": "unauthorized"}, status_code=401)
+                    await resp(scope, receive, send)
+                    return
+        await self.app(scope, receive, send)
+
+
+# 先注册鉴权（内层），再注册 CORS（外层）：让 OPTIONS 预检先被 CORS 处理，
+# 鉴权只拦截真正的请求（预检请求不携带 Authorization 头）。
+app.add_middleware(TokenAuthMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -61,19 +85,22 @@ def get_document(doc_id: str) -> dict:
 @app.post("/api/documents")
 async def upload_document(file: UploadFile = File(...)) -> dict:
     name = file.filename or "untitled"
-    raw = await file.read()
     lower = name.lower()
 
-    content = ""
-    if lower.endswith(".pdf"):
-        try:
-            content, _ = pdf.extract_text_with_flag(raw)
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
-    elif lower.endswith(".md"):
-        content = raw.decode("utf-8", errors="replace")
-    else:
+    if not (lower.endswith(".pdf") or lower.endswith(".md")):
         raise HTTPException(status_code=400, detail="仅支持 .md 和 .pdf 文件")
+
+    # 只读上限 +1 字节即可判断是否超限，避免把整个文件读进内存。
+    raw = await file.read(config.MAX_UPLOAD_BYTES + 1)
+    if len(raw) > config.MAX_UPLOAD_BYTES:
+        limit_mb = config.MAX_UPLOAD_BYTES // (1024 * 1024)
+        raise HTTPException(status_code=413, detail=f"文件过大（上限 {limit_mb}MB）")
+
+    content = ""
+    if lower.endswith(".md"):
+        content = raw.decode("utf-8", errors="replace")
+    # .pdf 不在请求内同步解析：文本提取下沉到后台 _run_reindex（会从落盘文件
+    # 重新提取），避免大 PDF 拖慢响应、扫描件在请求里白跑一遍 OCR。
 
     # Async-first: accept the file, return immediately, index in background.
     doc_id = db.insert_document(name, content, status="processing")
@@ -148,14 +175,22 @@ _partial_lock = threading.Lock()
 _job_lock = threading.Lock()
 
 
+def _reindex_update(doc_id: str, **updates) -> None:
+    """幂等更新后台任务状态：文档可能已被删除（delete_document 会 pop 状态），
+    此时静默跳过，避免后台线程对已删除 doc 写状态时 KeyError 崩溃。"""
+    st = _reindex_status.get(doc_id)
+    if st is not None:
+        st.update(updates)
+
+
 def _is_blank_chunk(text: str) -> bool:
-    """纯页码块（空白/分隔页只剩 '# 第 N 页'）或只含页脚页码的碎片不进入检索。"""
+    """只丢弃「纯页标 / 纯页码碎片」块。不再按长度+标点一刀切，否则会误删
+    无句读的定义句、标题、短列表项（如「中断向量表」）。"""
     body = _PAGE_MARK_ONLY_RE.sub("", text).strip()
     if not body:
         return True
-    if len(body) < 24 and not re.search(r"[，。；、,.?:;]", body):
-        return True
-    return False
+    # 只剩页码/空白（如页脚 "37"、"37 / 335"）才算空块
+    return bool(re.fullmatch(r"[\d\s\-–—./]*", body))
 
 
 _PAGE_MARK_ONLY_RE = re.compile(r"#\s*第\s*\d+\s*页\s*")
@@ -164,7 +199,8 @@ _PAGE_MARK_ONLY_RE = re.compile(r"#\s*第\s*\d+\s*页\s*")
 def _build_index(doc_id: str) -> None:
     from . import ocr
 
-    content = ocr.extract_ocr(doc_id)
+    # 部分索引：只嵌入已缓存的页，不再补齐缺页（否则会嵌套跑完整本书的 OCR）。
+    content = ocr.extract_ocr(doc_id, ocr_missing=False)
     chunks = chunker.chunk_markdown(
         content, max_chars=config.CHUNK_SIZE, overlap=config.CHUNK_OVERLAP
     )
@@ -172,8 +208,9 @@ def _build_index(doc_id: str) -> None:
     embeddings = [
         None if _is_blank_chunk(c["text"]) else e for c, e in zip(chunks, embeddings)
     ]
-    db.replace_document(doc_id, content, chunks, embeddings)
-    retriever.reload()
+    if db.get_document(doc_id) is not None:
+        db.replace_document(doc_id, content, chunks, embeddings)
+        retriever.reload()
 
 
 def _run_reindex(doc_id: str) -> None:
@@ -192,12 +229,10 @@ def _run_reindex_locked(doc_id: str) -> None:
             return
         is_pdf = doc["name"].lower().endswith(".pdf")
         total = pdf.page_count(doc_id) if is_pdf else 1
-        _reindex_status[doc_id]["total"] = total
+        _reindex_update(doc_id, total=total)
 
         def progress(n, t):
-            _reindex_status[doc_id].update(
-                {"page": n, "total": t, "stage": "ocr"}
-            )
+            _reindex_update(doc_id, page=n, total=t, stage="ocr")
             do_build = False
             with _partial_lock:
                 if (
@@ -226,7 +261,7 @@ def _run_reindex_locked(doc_id: str) -> None:
             content = doc["content"]
             used_ocr = False
 
-        _reindex_status[doc_id]["stage"] = "embed"
+        _reindex_update(doc_id, stage="embed")
         chunks = chunker.chunk_markdown(
             content, max_chars=config.CHUNK_SIZE, overlap=config.CHUNK_OVERLAP
         )
@@ -241,22 +276,23 @@ def _run_reindex_locked(doc_id: str) -> None:
         except Exception as exc:
             warning = str(exc)
             embeddings = [None] * len(chunks)
+        if db.get_document(doc_id) is None:
+            return  # 文档在后台处理期间被删除，放弃写入，避免孤儿 chunk
         db.replace_document(doc_id, content, chunks, embeddings)
         retriever.reload()
         db.set_doc_status(doc_id, "ready")
-        _reindex_status[doc_id].update(
-            {
-                "state": "done",
-                "chunk_count": len(chunks),
-                "chars": len(content),
-                "used_ocr": used_ocr,
-                "stage": None,
-                "warning": warning,
-            }
+        _reindex_update(
+            doc_id,
+            state="done",
+            chunk_count=len(chunks),
+            chars=len(content),
+            used_ocr=used_ocr,
+            stage=None,
+            warning=warning,
         )
     except Exception as exc:
         db.set_doc_status(doc_id, "error")
-        _reindex_status[doc_id].update({"state": "error", "error": str(exc)})
+        _reindex_update(doc_id, state="error", error=str(exc))
 
 
 def _start_reindex(doc_id: str) -> bool:

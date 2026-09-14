@@ -1,8 +1,14 @@
-fastapi
-uvicorn[standard]
-openai
-numpy
-python-dotenv
-python-multipart
-fastembed
-onnxruntime
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+openai==3.13.0
+numpy==2.5.3
+python-dotenv==1.2.3
+python-multipart==0.0.32
+fastembed==0.8.0
+onnxruntime==1.30.0
+pymupdf==1.28.2
+rapidocr-onnxruntime==1.2.3
+
+# 可选：语义重排（bge-reranker）。未安装时自动回退到词汇/MMR 检索。
+# 若启用请先 `pip install infinity-emb`，并按实际版本锁定。
+# infinity-emb
