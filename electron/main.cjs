@@ -11,6 +11,25 @@ const net = require("net");
 const path = require("path");
 const fs = require("fs");
 const http = require("http");
+const crypto = require("crypto");
+
+// 每次启动生成随机 API 令牌：后端据此要求 Authorization 头，前端经 preload 注入，
+// 防止局域网内其它主机 / 浏览器里的网页跨站读写本地接口（删文档、烧 API key 等）。
+const API_TOKEN = crypto.randomBytes(24).toString("hex");
+
+// 单实例锁：避免两个实例各起一套服务、并发写同一个 SQLite。
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
+  app.quit();
+}
+app.on("second-instance", () => {
+  if (win) {
+    if (win.isMinimized()) win.restore();
+    win.focus();
+  }
+});
+
+let quitting = false;
 
 const DEV = !app.isPackaged;
 const ROOT = DEV ? path.resolve(__dirname, "..") : process.resourcesPath;
@@ -89,7 +108,13 @@ async function startChild(cmd, args, opts) {
   });
   child.stdout.on("data", (d) => log(`[${opts.name}] ${String(d).trimEnd()}`));
   child.stderr.on("data", (d) => log(`[${opts.name}:err] ${String(d).trimEnd()}`));
-  child.on("exit", (code, sig) => log(`[${opts.name}] exited code=${code} sig=${sig || "none"}`));
+  child.on("exit", (code, sig) => {
+    log(`[${opts.name}] exited code=${code} sig=${sig || "none"}`);
+    // 运行期子进程意外崩溃（非退出清理）→ 弹窗并退出，避免窗口指向死端口。
+    if (!quitting && (code !== 0 || sig)) {
+      showFatal(`子进程 [${opts.name}] 意外退出（code=${code} sig=${sig || "none"}）`);
+    }
+  });
   children.push(child);
   return child;
 }
@@ -122,7 +147,7 @@ async function bootstrapVenv() {
   log(`首次运行：用系统 Python(${sysPy}) 在 ${venvDir} 建 venv`);
   await runStep(sysPy, ["-m", "venv", venvDir], "创建 venv");
   let pip = py;
-  await runStep(pip, ["-m", "pip", "install", "--disable-pip-version-check", "-r", path.join(BACKEND_DIR, "requirements.txt")], "安装后端依赖（可能较久）");
+  await runStep(pip, ["-m", "pip", "install", "--disable-pip-version-check", "-i", "https://pypi.tuna.tsinghua.edu.cn/simple", "--timeout", "30", "-r", path.join(BACKEND_DIR, "requirements.txt")], "安装后端依赖（可能较久）");
   return py;
 }
 
@@ -134,10 +159,12 @@ function runStep(cmd, args, label) {
       env: { ...process.env, PIP_DISABLE_PIP_VERSION_CHECK: "1" },
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,
+      timeout: 900000, // 15 分钟兜底，避免 pip 卡死时窗口干等
     });
     let out = "";
     child.stdout.on("data", (d) => (out += String(d)));
     child.stderr.on("data", (d) => (out += String(d)));
+    child.on("error", (err) => reject(new Error(`${label} 启动失败: ${err.message}`)));
     child.on("close", (code) => {
       if (code === 0) resolve();
       else reject(new Error(`${label} 失败(code=${code}):\n${out.split("\n").slice(-8).join("\n")}`));
@@ -166,6 +193,7 @@ function backendEnvVars(port) {
     PDF_DATA_DIR: pdf,
     PDF_PAGES_DIR: pages,
     PDF_OCR_DIR: ocr,
+    NOTEBOOK_TOKEN: API_TOKEN,
   };
   // 目录表是只读资源，保留在打包目录里
   const toc = path.join(BACKEND_DIR, "data", "tocs.json");
@@ -230,6 +258,7 @@ async function boot() {
 
   const apiBase = `http://127.0.0.1:${backendPort}`;
   process.env.ELECTRON_API_BASE = apiBase;
+  process.env.ELECTRON_API_TOKEN = API_TOKEN;
   win = new BrowserWindow({
     width: 1440,
     height: 900,
@@ -250,7 +279,10 @@ async function boot() {
   return { BE, FE };
 }
 
+let fatalShown = false;
 async function showFatal(msg) {
+  if (fatalShown) return; // 幂等：boot 失败 + 子进程 exit 可能同时触发
+  fatalShown = true;
   log(`fatal: ${msg}`);
   try {
     await dialog.showMessageBox({ type: "error", title: "notebook 启动失败", message: String(msg), detail: String(msg) });
@@ -258,13 +290,16 @@ async function showFatal(msg) {
   app.exit(1);
 }
 
-app.whenReady().then(() => {
-  boot().catch((e) => showFatal(e));
-});
+if (gotLock) {
+  app.whenReady().then(() => {
+    boot().catch((e) => showFatal(e));
+  });
+}
 
 app.on("window-all-closed", () => app.quit());
 
 app.on("before-quit", () => {
+  quitting = true;
   log("shutting down");
   for (const c of children) {
     try {
