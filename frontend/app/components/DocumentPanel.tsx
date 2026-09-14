@@ -169,6 +169,8 @@ export function DocumentPanel({
   const [sortOpen, setSortOpen] = useState(false);
   const sortRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [pasting, setPasting] = useState(false);
+  const [pasteText, setPasteText] = useState("");
 
   const showList = !doc;
 
@@ -409,6 +411,52 @@ export function DocumentPanel({
                 e.target.value = "";
               }}
             />
+            <button
+              onClick={() => setPasting((v) => !v)}
+              disabled={uploading}
+              className="mt-2 flex w-full items-center justify-center gap-2 rounded-full border border-black/[0.07] px-4 py-1.5 text-[12px] font-medium text-zinc-500 transition-all hover:bg-black/[0.04] hover:text-zinc-700 disabled:opacity-50 dark:border-white/10 dark:text-zinc-400 dark:hover:bg-white/[0.06] dark:hover:text-zinc-200"
+            >
+              <FileText className="h-3.5 w-3.5" strokeWidth={2} />
+              Paste text
+            </button>
+            {pasting && (
+              <div className="mt-2 space-y-2">
+                <textarea
+                  value={pasteText}
+                  onChange={(e) => setPasteText(e.target.value)}
+                  rows={4}
+                  autoFocus
+                  placeholder="Paste Markdown / plain text…"
+                  className="w-full resize-none rounded-xl border border-black/[0.08] bg-[#fbfbfd] px-3 py-2 text-[13px] leading-6 text-zinc-800 outline-none focus:ring-1 focus:ring-[#0b57d0] dark:border-white/10 dark:bg-[#1a1d22] dark:text-zinc-200 dark:focus:ring-[#a8c7fa]"
+                />
+                <div className="flex justify-end gap-1.5">
+                  <button
+                    onClick={() => {
+                      setPasting(false);
+                      setPasteText("");
+                    }}
+                    className="rounded-lg px-2.5 py-1 text-[12px] text-zinc-500 hover:bg-black/[0.05] dark:hover:bg-white/[0.08]"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      const text = pasteText.trim();
+                      if (!text) return;
+                      const name = `Pasted ${new Date().toISOString().slice(5, 16).replace("T", " ")}.md`;
+                      const file = new File([text], name, { type: "text/markdown" });
+                      onUpload([file]);
+                      setPasteText("");
+                      setPasting(false);
+                    }}
+                    disabled={!pasteText.trim()}
+                    className="rounded-lg bg-[#0b57d0] px-3 py-1 text-[12px] font-medium text-white hover:bg-[#0a4fc4] disabled:opacity-40 dark:bg-[#a8c7fa] dark:text-[#1a1d22] dark:hover:bg-[#93b8e8]"
+                  >
+                    Add
+                  </button>
+                </div>
+              </div>
+            )}
             {uploading && (
               <div className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
                 <div

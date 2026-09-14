@@ -1,0 +1,2 @@
+# 开发/测试依赖（运行 `pytest tests/` 需要）
+pytest

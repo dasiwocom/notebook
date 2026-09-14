@@ -12,6 +12,7 @@ import {
   Plus,
   Quote,
   RotateCcw,
+  Save,
   SendHorizontal,
   Settings,
   Sparkles,
@@ -35,6 +36,7 @@ type Props = {
   onNewConversation: () => void;
   onSwitchConversation: (id: string) => void;
   onDeleteConversation: (id: string) => void;
+  onSaveToNote: (content: string) => void;
 };
 
 function CitationLink({ n, onCite }: { n: number; onCite: (n: number) => void }) {
@@ -164,11 +166,13 @@ const AssistantCard = memo(function AssistantCard({
   onCite,
   onSend,
   onRetry,
+  onSaveToNote,
 }: {
   m: ChatMessage;
   onCite: (msgId: string, n: number) => void;
   onSend: (t: string) => void;
   onRetry: (t: string) => void;
+  onSaveToNote: (content: string) => void;
 }) {
   const [openSources, setOpenSources] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -291,7 +295,15 @@ const AssistantCard = memo(function AssistantCard({
       )}
 
       {!m.error && m.content.trim() && (
-        <div className="mt-4 flex items-center justify-end">
+        <div className="mt-4 flex items-center justify-end gap-1">
+          <button
+            onClick={() => onSaveToNote(m.content)}
+            className="press flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium text-zinc-300 transition-colors hover:text-zinc-500 dark:text-zinc-600 dark:hover:text-zinc-300"
+            title="Save to note"
+          >
+            <Save className="h-3.5 w-3.5" strokeWidth={2} />
+            Save to note
+          </button>
           <button
             onClick={copy}
             className={`press flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
@@ -327,6 +339,7 @@ export function ChatPanel({
   onNewConversation,
   onSwitchConversation,
   onDeleteConversation,
+  onSaveToNote,
 }: Props) {
   const [input, setInput] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -550,6 +563,7 @@ export function ChatPanel({
                 onCite={onCite}
                 onSend={onSend}
                 onRetry={onSend}
+                onSaveToNote={onSaveToNote}
               />
             )
           )}

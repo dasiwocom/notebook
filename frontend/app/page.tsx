@@ -16,6 +16,7 @@ import type { HighlightReq } from "./components/DocumentPanel";
 import {
   chatStream,
   createConversation,
+  createNote,
   deleteConversation,
   deleteDocument,
   getConversation,
@@ -532,6 +533,24 @@ export default function Home() {
     [selectedId]
   );
 
+  // 对话答案存为笔记（笔记挂在单一选中文档下，与 Studio 一致）
+  const handleSaveToNote = useCallback(
+    async (content: string) => {
+      const targetDoc = conversationIds.size === 1 ? [...conversationIds][0] : null;
+      if (!targetDoc) {
+        setNotice("Save to note: select exactly one source document first");
+        return;
+      }
+      try {
+        await createNote(targetDoc, content);
+        setNotice("Saved to note");
+      } catch (e) {
+        setNotice(`Failed to save note: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    },
+    [conversationIds]
+  );
+
   const handleClearChat = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
@@ -709,6 +728,7 @@ export default function Home() {
             onNewConversation={handleNewConversation}
             onSwitchConversation={handleSwitchConversation}
             onDeleteConversation={handleDeleteConversation}
+            onSaveToNote={handleSaveToNote}
           />
         </main>
         {!sbCollapsed && (
