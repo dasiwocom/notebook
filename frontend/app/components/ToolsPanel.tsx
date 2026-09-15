@@ -110,6 +110,7 @@ type Props = {
   docId?: string | null;
   convId?: string | null;
   onCite: (citation: Citation) => void;
+  onAskNode?: (label: string) => void;
 };
 
 function toCiteMarkdown(content: string): string {
@@ -197,39 +198,98 @@ function OutputMarkdown({
 
 /* ── Mind Map ─────────────────────────────────────────────────────── */
 
-function MindMapTree({ node, depth = 0 }: { node: MindMapNode; depth?: number }) {
-  const [open, setOpen] = useState(depth < 2);
-  const hasChildren = node.children && node.children.length > 0;
+type Markmap = import("markmap-view").Markmap;
+type MarkmapINode = import("markmap-common").INode;
+
+function stripTags(html: string): string {
+  const el = document.createElement("div");
+  el.innerHTML = html;
+  return el.textContent?.trim() ?? "";
+}
+
+function toMarkmapData(n: MindMapNode): import("markmap-common").IPureNode {
+  return {
+    content: n.label.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"),
+    payload: { label: n.label },
+    children: (n.children ?? []).map(toMarkmapData),
+  };
+}
+
+function MindMapCanvas({
+  node,
+  onAsk,
+  fill = false,
+}: {
+  node: MindMapNode;
+  onAsk?: (label: string) => void;
+  fill?: boolean;
+}) {
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+  const mmRef = useRef<Markmap | null>(null);
+  const onAskRef = useRef(onAsk);
+  onAskRef.current = onAsk;
+
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    const svg = svgRef.current;
+    if (!wrap || !svg) return;
+    let mm: Markmap | null = null;
+    let destroyed = false;
+
+    const data = toMarkmapData(node);
+    const mmPromise = import("markmap-view").then(({ Markmap }) => {
+      if (destroyed) return null;
+      mm = Markmap.create(svg, {
+        duration: 400,
+        initialExpandLevel: -1,
+        maxWidth: 280,
+        spacingHorizontal: 70,
+        spacingVertical: 10,
+        paddingX: 14,
+        pan: true,
+        zoom: true,
+        scrollForPan: false,
+        autoFit: true,
+      }, data);
+      mmRef.current = mm;
+      return mm;
+    });
+
+    const onClick = (e: MouseEvent) => {
+      const target = e.target as Element | null;
+      const g = target?.closest?.("g.markmap-node") as SVGGElement | null;
+      if (!g) return;
+      const data = (g as unknown as { __data__?: MarkmapINode }).__data__;
+      if (!data) return;
+      if (data.children && data.children.length) {
+        mmRef.current?.toggleNode(data);
+      } else {
+        const label = data.payload?.label as string | undefined;
+        const content = label ?? stripTags(data.content);
+        if (content) onAskRef.current?.(content);
+      }
+    };
+    wrap.addEventListener("click", onClick);
+
+    return () => {
+      destroyed = true;
+      wrap.removeEventListener("click", onClick);
+      mmPromise.then((m) => m?.destroy());
+      mmRef.current = null;
+    };
+  }, [node]);
+
   return (
-    <div>
-      <div
-        className="flex items-center gap-1.5 py-0.5 text-[13px] text-zinc-700 dark:text-zinc-300"
-        style={{ paddingLeft: depth * 16 }}
-      >
-        {hasChildren ? (
-          <button
-            onClick={() => setOpen(!open)}
-            className="flex h-4 w-4 shrink-0 items-center justify-center rounded text-zinc-400 hover:bg-black/[0.05] dark:hover:bg-white/[0.08]"
-          >
-            <ChevronDown
-              className={`h-3 w-3 transition-transform ${open ? "" : "-rotate-90"}`}
-              strokeWidth={2}
-            />
-          </button>
-        ) : (
-          <span className="inline-block h-4 w-4 shrink-0" />
-        )}
-        <span
-          className={`min-w-0 ${depth === 0 ? "text-[14px] font-semibold text-zinc-900 dark:text-zinc-50" : depth === 1 ? "font-medium text-zinc-800 dark:text-zinc-200" : ""}`}
-        >
-          {node.label}
-        </span>
-      </div>
-      {open &&
-        hasChildren &&
-        node.children!.map((child, i) => (
-          <MindMapTree key={`${child.label}-${i}`} node={child} depth={depth + 1} />
-        ))}
+    <div
+      ref={wrapRef}
+      className={`relative w-full touch-none select-none overflow-hidden ${
+        fill
+          ? "h-full"
+          : "h-[65vh] min-h-[360px] rounded-xl border border-black/[0.05] bg-white/60 dark:border-white/[0.06] dark:bg-white/[0.02]"
+      }`}
+    >
+      <svg ref={svgRef} className="absolute inset-0 h-full w-full" />
     </div>
   );
 }
@@ -321,25 +381,32 @@ export function ToolsPanel({
   docId,
   convId,
   onCite,
+  onAskNode,
 }: Props) {
   const [outputs, setOutputs] = useState<Output[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [collapsedNotes, setCollapsedNotes] = useState<Set<string>>(new Set());
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [activeKind, setActiveKind] = useState<"output" | "note" | null>(null);
   const abortRef = useRef<Map<string, AbortController>>(new Map());
   const scrollRef = useRef<HTMLDivElement>(null);
   const outputsRef = useRef<Output[]>([]);
   outputsRef.current = outputs;
+  const hydratedRef = useRef(false);
 
   // load this conversation's studio outputs from the backend
   useEffect(() => {
     if (!convId) {
       setOutputs([]);
+      hydratedRef.current = false;
       return;
     }
+    hydratedRef.current = false;
     listStudies(convId)
-      .then((list) =>
+      .then((list) => {
+        hydratedRef.current = true;
         setOutputs(
           list.map((s, i) => ({
             id: s.id,
@@ -353,9 +420,11 @@ export function ToolsPanel({
             citations: (s.citations ?? []) as Citation[],
             ts: Date.now() - (list.length - 1 - i) * 1000,
           }))
-        )
-      )
-      .catch(() => {});
+        );
+      })
+      .catch(() => {
+        hydratedRef.current = true;
+      });
   }, [convId]);
 
   // load this document's notes into the same outputs list
@@ -377,8 +446,9 @@ export function ToolsPanel({
   }, [loadNotes]);
 
   // persist finished outputs to the backend (debounced)
+  // 只在 listStudies 水合完成后才允许写回，避免用空数组覆盖数据库（删除竞态）
   useEffect(() => {
-    if (!convId) return;
+    if (!convId || !hydratedRef.current) return;
     const t = window.setTimeout(() => {
       const done = outputsRef.current
         .filter((o) => o.status === "done" && o.content.trim().length > 0)
@@ -580,6 +650,23 @@ export function ToolsPanel({
     );
   }
 
+  const activeItem = activeId
+    ? activeKind === "note"
+      ? items.find((it) => it.kind === "note" && it.n.id === activeId)
+      : items.find((it) => it.kind === "output" && it.o.id === activeId)
+    : null;
+
+  const exitPreview = () => {
+    setActiveId(null);
+    setActiveKind(null);
+  };
+
+  const isFullPreview = !!(
+    activeItem &&
+    activeItem.kind === "output" &&
+    isMindMapOutput(activeItem.o)
+  );
+
   return (
     <aside
       className="mb-view mb-tools flex h-full shrink-0 flex-col overflow-hidden rounded-[20px] bg-[var(--card)]"
@@ -587,16 +674,74 @@ export function ToolsPanel({
     >
       <div className="mb-head flex h-12 shrink-0 items-center gap-2 border-b border-black/[0.05] px-4 dark:border-white/10">
         <h2 className="text-[15px] text-zinc-800 dark:text-zinc-100">Studio</h2>
-        <button
-          onClick={onToggleCollapse}
-          className="ml-auto rounded-full p-2 text-zinc-400 transition-colors hover:bg-black/[0.04] hover:text-zinc-600 dark:hover:bg-white/[0.06] dark:hover:text-zinc-200"
-          title="Collapse studio"
-        >
-          <PanelRight className="h-4 w-4" strokeWidth={2} />
-        </button>
+        {activeItem ? (
+          <button
+            onClick={exitPreview}
+            className="ml-auto rounded-full p-2 text-zinc-400 transition-colors hover:bg-black/[0.04] hover:text-zinc-600 dark:hover:bg-white/[0.06] dark:hover:text-zinc-200"
+            title="Back to outputs"
+          >
+            <ChevronLeft className="h-4 w-4" strokeWidth={2} />
+          </button>
+        ) : (
+          <button
+            onClick={onToggleCollapse}
+            className="ml-auto rounded-full p-2 text-zinc-400 transition-colors hover:bg-black/[0.04] hover:text-zinc-600 dark:hover:bg-white/[0.06] dark:hover:text-zinc-200"
+            title="Collapse studio"
+          >
+            <PanelRight className="h-4 w-4" strokeWidth={2} />
+          </button>
+        )}
       </div>
 
-      <div className="shrink-0 px-3 pt-3">
+      {activeItem ? (
+        /* ── preview view: full-height single item ── */
+        <div className={`min-h-0 flex-1 ${isFullPreview ? "overflow-hidden" : "overflow-y-auto"}`}>
+{activeItem.kind === "note" ? (
+          <div className="p-4">
+            <NoteDetail
+              n={activeItem.n}
+              editing={editingId === activeItem.n.id}
+              draft={draft}
+              onDraft={setDraft}
+              onStartEdit={() => {
+                setEditingId(activeItem.n.id);
+                setDraft(activeItem.n.content);
+              }}
+              onCancelEdit={() => setEditingId(null)}
+              onSave={() => save(activeItem.n.id)}
+              onRemove={() => {
+                remove(activeItem.n.id);
+                exitPreview();
+              }}
+            />
+          </div>
+        ) : isMindMapOutput(activeItem.o) ? (
+          <div className="h-full">
+            <OutputBody
+              o={activeItem.o}
+              onCite={onCite}
+              onAskNode={onAskNode}
+              fill
+            />
+          </div>
+        ) : (
+          <OutputDetail
+            o={activeItem.o}
+            docId={docId}
+            onStop={() => abortRef.current.get(activeItem.o.id)?.abort()}
+            onSaveToNotes={saveOutputToNotes}
+            onDismiss={() => {
+              dismiss(activeItem.o.id);
+              exitPreview();
+            }}
+            onCite={onCite}
+            onAskNode={onAskNode}
+          />
+        )}
+        </div>
+      ) : (
+        <>
+        <div className="shrink-0 px-3 pt-3">
         <div className="grid grid-cols-2 gap-1.5">
           {TOOLS.map((t) => (
             <button
@@ -653,19 +798,28 @@ export function ToolsPanel({
                     o={it.o}
                     docId={docId}
                     onToggle={() => toggleExpand(it.o.id)}
+                    onOpen={() => {
+                      setActiveId(it.o.id);
+                      setActiveKind("output");
+                    }}
                     onStop={() => abortRef.current.get(it.o.id)?.abort()}
                     onSaveToNotes={saveOutputToNotes}
                     onDismiss={() => dismiss(it.o.id)}
                     onCite={onCite}
+                    onAskNode={onAskNode}
                   />
                 ) : (
                   <NoteCard
                     key={it.n.id}
                     n={it.n}
-                    expanded={!collapsedNotes.has(it.n.id)}
+                    expanded={editingId === it.n.id}
                     editing={editingId === it.n.id}
                     draft={draft}
                     onToggle={() => toggleNote(it.n.id)}
+                    onOpen={() => {
+                      setActiveId(it.n.id);
+                      setActiveKind("note");
+                    }}
                     onDraft={setDraft}
                     onStartEdit={() => {
                       setEditingId(it.n.id);
@@ -686,8 +840,60 @@ export function ToolsPanel({
           )}
         </div>
       </div>
+        </>
+      )}
     </aside>
   );
+}
+
+/* ── Output body (shared between card and full preview) ──────────── */
+
+function isMindMapOutput(o: Output): boolean {
+  return !!(
+    o.structured &&
+    typeof o.structured === "object" &&
+    "label" in o.structured &&
+    !Array.isArray(o.structured)
+  );
+}
+
+function OutputBody({
+  o,
+  onCite,
+  onAskNode,
+  fill = false,
+}: {
+  o: Output;
+  onCite: (c: Citation) => void;
+  onAskNode?: (label: string) => void;
+  fill?: boolean;
+}) {
+  const isMindMap = isMindMapOutput(o);
+  const isQuiz =
+    Array.isArray(o.structured) && o.structured.length > 0 && "q" in o.structured[0];
+
+  if (o.status === "error") return <p className="text-sm text-red-500">{o.error}</p>;
+  if (isMindMap)
+    return (
+      <MindMapCanvas
+        node={o.structured as MindMapNode}
+        onAsk={onAskNode}
+        fill={fill}
+      />
+    );
+  if (isQuiz) return <QuizCards questions={o.structured as QuizQuestion[]} />;
+  if (o.content.trim()) {
+    return <OutputMarkdown content={o.content} citations={o.citations} onCite={onCite} />;
+  }
+  if (o.status === "running") {
+    return (
+      <p className="flex items-center gap-2 text-[13px] text-zinc-400 dark:text-zinc-500">
+        <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2} />
+        Generating…
+      </p>
+    );
+  }
+  return <p className="text-sm text-zinc-400 dark:text-zinc-500">Waiting…</p>;
 }
 
 /* ── Output card (tool results, same visual language as notes) ───── */
@@ -696,27 +902,24 @@ function OutputCard({
   o,
   docId,
   onToggle,
+  onOpen,
   onStop,
   onSaveToNotes,
   onDismiss,
   onCite,
+  onAskNode,
 }: {
   o: Output;
   docId?: string | null;
   onToggle: () => void;
+  onOpen: () => void;
   onStop: () => void;
   onSaveToNotes: (content: string) => void;
   onDismiss: () => void;
   onCite: (c: Citation) => void;
+  onAskNode?: (label: string) => void;
 }) {
   const [saved, setSaved] = useState(false);
-  const isMindMap =
-    o.structured &&
-    typeof o.structured === "object" &&
-    "label" in o.structured &&
-    !Array.isArray(o.structured);
-  const isQuiz =
-    Array.isArray(o.structured) && o.structured.length > 0 && "q" in o.structured[0];
 
   const handleSave = async () => {
     await onSaveToNotes(o.content);
@@ -724,13 +927,21 @@ function OutputCard({
     setTimeout(() => setSaved(false), 2000);
   };
 
+  // running 态直接内联展开（无需进预览），done/error 点击进预览
+  const inline = o.status === "running";
+  const isMindMap =
+    o.structured &&
+    typeof o.structured === "object" &&
+    "label" in o.structured &&
+    !Array.isArray(o.structured);
+
   return (
     <div className="animate-rise group overflow-hidden rounded-[14px] border border-black/[0.05] bg-white shadow-sm dark:border-white/10 dark:bg-[#1f2327]">
       <div className="flex items-center gap-2 px-3 py-2">
         <button
-          onClick={onToggle}
+          onClick={inline ? onToggle : onOpen}
           className="flex min-w-0 flex-1 items-center gap-2 text-left"
-          title={o.expanded ? "Collapse" : "Expand"}
+          title={inline ? o.expanded ? "Collapse" : "Expand" : "Open preview"}
         >
           <span
             className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg"
@@ -747,10 +958,15 @@ function OutputCard({
               Generating
             </span>
           )}
-          <ChevronDown
-            className={`h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform ${o.expanded ? "" : "-rotate-90"}`}
-            strokeWidth={2}
-          />
+          {!inline && (
+            <ChevronRight className="h-3.5 w-3.5 shrink-0 text-zinc-400" strokeWidth={2} />
+          )}
+          {inline && (
+            <ChevronDown
+              className={`h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform ${o.expanded ? "" : "-rotate-90"}`}
+              strokeWidth={2}
+            />
+          )}
         </button>
         {o.status === "running" && (
           <button
@@ -782,19 +998,14 @@ function OutputCard({
           <X className="h-3.5 w-3.5" strokeWidth={2} />
         </button>
       </div>
-      {o.expanded && (
+      {inline && o.expanded && (
         <div className="border-t border-black/[0.04] px-4 py-3 dark:border-white/5">
-          {o.status === "error" ? (
-            <p className="text-sm text-red-500">{o.error}</p>
-          ) : isMindMap ? (
-            <MindMapTree node={o.structured as MindMapNode} />
-          ) : isQuiz ? (
-            <QuizCards questions={o.structured as QuizQuestion[]} />
-          ) : o.content.trim() ? (
-            <OutputMarkdown content={o.content} citations={o.citations} onCite={onCite} />
-          ) : (
-            <p className="text-sm text-zinc-400 dark:text-zinc-500">Waiting…</p>
-          )}
+          <OutputBody o={o} onCite={onCite} onAskNode={onAskNode} />
+        </div>
+      )}
+      {o.status === "error" && (
+        <div className="border-t border-black/[0.04] px-4 py-3 dark:border-white/5">
+          <p className="text-sm text-red-500">{o.error}</p>
         </div>
       )}
     </div>
@@ -809,6 +1020,7 @@ function NoteCard({
   editing,
   draft,
   onToggle,
+  onOpen,
   onDraft,
   onStartEdit,
   onCancelEdit,
@@ -820,6 +1032,7 @@ function NoteCard({
   editing: boolean;
   draft: string;
   onToggle: () => void;
+  onOpen: () => void;
   onDraft: (v: string) => void;
   onStartEdit: () => void;
   onCancelEdit: () => void;
@@ -831,9 +1044,9 @@ function NoteCard({
     <div className="animate-rise group overflow-hidden rounded-[14px] border border-black/[0.05] bg-white shadow-sm dark:border-white/10 dark:bg-[#1f2327]">
       <div className="flex items-center gap-2 px-3 py-2">
         <button
-          onClick={onToggle}
+          onClick={editing ? onToggle : onOpen}
           className="flex min-w-0 flex-1 items-center gap-2 text-left"
-          title={expanded ? "Collapse" : "Expand"}
+          title="Open preview"
         >
           <span
             className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg"
@@ -844,10 +1057,7 @@ function NoteCard({
           <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-zinc-700 dark:text-zinc-200">
             笔记
           </span>
-          <ChevronDown
-            className={`h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform ${expanded ? "" : "-rotate-90"}`}
-            strokeWidth={2}
-          />
+          <ChevronRight className="h-3.5 w-3.5 shrink-0 text-zinc-400" strokeWidth={2} />
         </button>
         {!editing && (
           <>
@@ -904,6 +1114,177 @@ function NoteCard({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+/* ── Full-height preview (list → preview, like sources panel) ─────── */
+
+function OutputDetail({
+  o,
+  docId,
+  onStop,
+  onSaveToNotes,
+  onDismiss,
+  onCite,
+  onAskNode,
+}: {
+  o: Output;
+  docId?: string | null;
+  onStop: () => void;
+  onSaveToNotes: (content: string) => void;
+  onDismiss: () => void;
+  onCite: (c: Citation) => void;
+  onAskNode?: (label: string) => void;
+}) {
+  const [saved, setSaved] = useState(false);
+  const handleSave = async () => {
+    await onSaveToNotes(o.content);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <span
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+          style={{ backgroundColor: o.color }}
+        >
+          <o.icon className="h-5 w-5" strokeWidth={2} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[14px] font-semibold text-zinc-800 dark:text-zinc-100">
+            {o.label}
+          </p>
+          {o.status === "running" && (
+            <p className="flex items-center gap-1.5 text-[11px] text-zinc-400">
+              <Loader2 className="h-3 w-3 animate-spin" strokeWidth={2} />
+              Generating
+            </p>
+          )}
+        </div>
+        <div className="flex shrink-0 items-center gap-0.5">
+          {o.status === "running" && (
+            <button
+              onClick={onStop}
+              className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-black/[0.04] hover:text-zinc-600 dark:hover:bg-white/[0.06] dark:hover:text-zinc-200"
+              title="Stop"
+            >
+              <Square className="h-4 w-4 fill-current" strokeWidth={2} />
+            </button>
+          )}
+          {o.status === "done" && docId && (
+            <button
+              onClick={handleSave}
+              className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-black/[0.04] hover:text-zinc-600 dark:hover:bg-white/[0.06] dark:hover:text-zinc-200"
+              title="保存为笔记"
+            >
+              {saved ? (
+                <CircleCheck className="h-4 w-4 text-emerald-500" strokeWidth={2} />
+              ) : (
+                <Save className="h-4 w-4" strokeWidth={2} />
+              )}
+            </button>
+          )}
+          <button
+            onClick={onDismiss}
+            className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-black/[0.04] hover:text-zinc-600 dark:hover:bg-white/[0.06] dark:hover:text-zinc-200"
+            title="Remove"
+          >
+            <X className="h-4 w-4" strokeWidth={2} />
+          </button>
+        </div>
+      </div>
+      <div className="border-t border-black/[0.05] pt-4 dark:border-white/10">
+        <OutputBody o={o} onCite={onCite} onAskNode={onAskNode} />
+      </div>
+    </div>
+  );
+}
+
+function NoteDetail({
+  n,
+  editing,
+  draft,
+  onDraft,
+  onStartEdit,
+  onCancelEdit,
+  onSave,
+  onRemove,
+}: {
+  n: Note;
+  editing: boolean;
+  draft: string;
+  onDraft: (v: string) => void;
+  onStartEdit: () => void;
+  onCancelEdit: () => void;
+  onSave: () => void;
+  onRemove: () => void;
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <span
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+          style={{ backgroundColor: NOTE_COLOR }}
+        >
+          <PenLine className="h-5 w-5 text-zinc-600 dark:text-zinc-300" strokeWidth={2} />
+        </span>
+        <p className="min-w-0 flex-1 truncate text-[14px] font-semibold text-zinc-800 dark:text-zinc-100">
+          笔记
+        </p>
+        <div className="flex shrink-0 items-center gap-0.5">
+          {!editing && (
+            <button
+              onClick={onStartEdit}
+              className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-black/[0.04] hover:text-zinc-600 dark:hover:bg-white/[0.06] dark:hover:text-zinc-200"
+              title="编辑"
+            >
+              <PenLine className="h-4 w-4" strokeWidth={2} />
+            </button>
+          )}
+          <button
+            onClick={onRemove}
+            className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-black/[0.04] hover:text-red-500 dark:hover:bg-white/[0.06]"
+            title="删除"
+          >
+            <Trash2 className="h-4 w-4" strokeWidth={2} />
+          </button>
+        </div>
+      </div>
+      <div className="border-t border-black/[0.05] pt-4 dark:border-white/10">
+        {editing ? (
+          <>
+            <textarea
+              value={draft}
+              onChange={(e) => onDraft(e.target.value)}
+              className="w-full resize-y rounded-lg border border-black/[0.08] bg-[#fbfbfd] px-3 py-2.5 text-[13px] leading-6 text-zinc-800 focus:outline-none focus:ring-1 focus:ring-[#0b57d0] dark:border-white/10 dark:bg-[#1a1d22] dark:text-zinc-200 dark:focus:ring-[#a8c7fa]"
+              rows={10}
+              autoFocus
+              placeholder="写点什么…"
+            />
+            <div className="mt-2 flex justify-end gap-1.5">
+              <button
+                onClick={onCancelEdit}
+                className="rounded-lg px-3 py-1.5 text-[12px] text-zinc-500 hover:bg-black/[0.05] dark:hover:bg-white/[0.08]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={onSave}
+                className="rounded-lg bg-[#0b57d0] px-3 py-1.5 text-[12px] font-medium text-white hover:bg-[#0a4fc4] dark:bg-[#a8c7fa] dark:text-[#1a1d22] dark:hover:bg-[#93b8e8]"
+              >
+                Save
+              </button>
+            </div>
+          </>
+        ) : n.content.trim() ? (
+          <OutputMarkdown content={n.content} />
+        ) : (
+          <p className="italic text-[13px] text-zinc-400 dark:text-zinc-500">Empty note</p>
+        )}
+      </div>
     </div>
   );
 }

@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "lucide-react": "^1.45.0",
+    "markmap-lib": "^0.18.12",
+    "markmap-view": "^0.18.12",
     "next": "^16.2.7",
     "react": "19.2.8",
     "react-dom": "19.2.8",

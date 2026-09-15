@@ -29,10 +29,11 @@ import {
 import type { ConversationInfo, LoadedMessage, PersistentMessage } from "./lib/api";
 import type { ChatMessage, Citation, DocumentDetail, DocumentInfo } from "./lib/types";
 
-const SIDEBAR_MIN = 200;
-const SIDEBAR_MAX = 640;
+const SIDEBAR_MIN = 220;
+const SIDEBAR_MAX = 1280;
 const DOC_MIN = 260;
-const DOC_MAX = 640;
+const DOC_MAX = 1280;
+const CHAT_MIN = 360;
 const LS_SIDEBAR = "bs:sidebarW";
 const LS_DOC = "bs:docW";
 
@@ -618,12 +619,26 @@ export default function Home() {
   const clamp = (v: number, min: number, max: number) =>
     Math.round(Math.min(max, Math.max(min, v)));
 
+  // 中间对话区受 CHAT_MIN 保护：动态计算当前窗口下侧栏可占的最大宽度
+  const sideMax = useCallback(
+    (other: number) => {
+      const inner = layoutRef.current?.clientWidth ?? window.innerWidth;
+      const dividers = (sbCollapsed ? 0 : 1) + (docCollapsed ? 0 : 1);
+      const pad = 16;
+      const gap = 4;
+      const divW = 12;
+      const others = 3 + dividers;
+      return inner - pad - (others - 1) * gap - dividers * divW - other - CHAT_MIN;
+    },
+    [sbCollapsed, docCollapsed]
+  );
+
   // 分隔线在当前面板的右缘/左缘位置决定符号：
   // 预览面板在左，分隔线在其右缘 → 向右拖 (=delta>0) 加宽 → prev + delta
   // 工具面板在右，分隔线在其左缘 → 向左拖 (=delta<0) 加宽 → prev - delta
   const moveDocDrag = (delta: number) => {
     setDocW((prev) => {
-      const next = clamp(prev + delta, DOC_MIN, DOC_MAX);
+      const next = clamp(prev + delta, DOC_MIN, Math.min(DOC_MAX, sideMax(sidebarW)));
       try {
         localStorage.setItem(LS_DOC, String(next));
       } catch {
@@ -635,7 +650,7 @@ export default function Home() {
 
   const moveSidebarDrag = (delta: number) => {
     setSidebarW((prev) => {
-      const next = clamp(prev - delta, SIDEBAR_MIN, SIDEBAR_MAX);
+      const next = clamp(prev - delta, SIDEBAR_MIN, Math.min(SIDEBAR_MAX, sideMax(docW)));
       try {
         localStorage.setItem(LS_SIDEBAR, String(next));
       } catch {
@@ -747,6 +762,7 @@ export default function Home() {
           docId={conversationIds.size === 1 ? [...conversationIds][0] : null}
           convId={convId}
           onCite={handleSourceJump}
+          onAskNode={(label) => handleSend(`详细讲讲"${label}"`)}
         />
       </div>
 
