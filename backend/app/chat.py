@@ -82,6 +82,53 @@ def has_llm_key() -> bool:
 # context 字符预算：防止 TOP_K 在设置里被调大后，拼接的源材料逼近模型上下文上限。
 _MAX_CONTEXT_CHARS = 12000
 
+# outline 解析较慢（要读 PDF 书签），按 doc 缓存，避免每条消息重复开 PDF。
+_outline_cache: dict[str, list[dict] | None] = {}
+
+
+def _chapter_for_page(outline: list[dict] | None, page: int) -> str | None:
+    """outline 按页码升序，找到最后一个 start_page <= page 的章节标题。"""
+    if not outline:
+        return None
+    chapter = None
+    for e in outline:
+        p = e.get("page")
+        if p is None:
+            continue
+        if int(p) <= page:
+            chapter = e.get("title")
+        else:
+            break
+    return chapter
+
+
+def _enrich_chapter_paths(results: list[dict]) -> list[dict]:
+    """给 chute path 头部补上一级章节标题：['第 75 页'] → ['第3章 xxx', '第 75 页']。
+
+    检索结束后才调用（页码过滤已在 retriever 内部用原始 path 完成），所以 prepend
+    不会影响 page_range 逻辑，只让引用描述/上下文更可信。
+    """
+    from . import db, study
+
+    for r in results:
+        doc_id = r.get("doc_id")
+        path = r.get("path") or []
+        page = None
+        for seg in path:
+            m = re.search(r"第\s*(\d+)\s*页", seg)
+            if m:
+                page = int(m.group(1))
+                break
+        if not doc_id or page is None:
+            continue
+        if doc_id not in _outline_cache:
+            d = db.get_document(doc_id)
+            _outline_cache[doc_id] = study.get_outline(d) if d else None
+        chapter = _chapter_for_page(_outline_cache.get(doc_id), page)
+        if chapter and not any(chapter in seg for seg in path):
+            r["path"] = [chapter] + path
+    return results
+
 
 def _build_context(results: list[dict]) -> str:
     parts = []
@@ -400,6 +447,7 @@ def answer_stream(
         results = _llm_rerank(rewritten, results)[:top_k]
     else:
         results = results[:top_k]
+    results = _enrich_chapter_paths(results)
     if not results:
         context = (
             "（本次没有检索到与问题直接相关的文档片段。"
@@ -420,7 +468,7 @@ def answer_stream(
     for h in recent:
         chat_messages.append(h)
     chat_messages.append(
-        {"role": "user", "content": f"源材料：\n{context}\n\n问题：{rewritten}"}
+        {"role": "user", "content": f"问题：{rewritten}\n\n源材料：\n{context}\n\n问题：{rewritten}"}
     )
 
     try:

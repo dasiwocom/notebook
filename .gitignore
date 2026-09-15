@@ -18,6 +18,7 @@ __pycache__/
 
 # ---- 运行时数据（上传的文档、数据库、分页图片等）----
 backend/data/
+backend/notebook.db
 
 # ---- 打包用的 Node 运行时二进制（需自行放入，见 electron/README.md）----
 electron/tools/

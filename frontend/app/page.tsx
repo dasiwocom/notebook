@@ -762,7 +762,7 @@ export default function Home() {
           docId={conversationIds.size === 1 ? [...conversationIds][0] : null}
           convId={convId}
           onCite={handleSourceJump}
-          onAskNode={(label) => handleSend(`详细讲讲"${label}"`)}
+          onAskNode={(q) => handleSend(q)}
         />
       </div>
 

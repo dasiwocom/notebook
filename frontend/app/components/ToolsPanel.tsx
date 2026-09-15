@@ -207,11 +207,14 @@ function stripTags(html: string): string {
   return el.textContent?.trim() ?? "";
 }
 
-function toMarkmapData(n: MindMapNode): import("markmap-common").IPureNode {
+function toMarkmapData(n: MindMapNode, chapter?: string): import("markmap-common").IPureNode {
+  const text = n.label.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const isChapter = /第\s*\d+\s*章/.test(n.label);
+  const c = chapter ?? (isChapter ? n.label : undefined);
   return {
-    content: n.label.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"),
-    payload: { label: n.label },
-    children: (n.children ?? []).map(toMarkmapData),
+    content: text,
+    payload: { label: n.label, chapter: c ?? "" },
+    children: (n.children ?? []).map((child) => toMarkmapData(child, c)),
   };
 }
 
@@ -266,8 +269,13 @@ function MindMapCanvas({
         mmRef.current?.toggleNode(data);
       } else {
         const label = data.payload?.label as string | undefined;
+        const chapter = data.payload?.chapter as string | undefined;
         const content = label ?? stripTags(data.content);
-        if (content) onAskRef.current?.(content);
+        if (!content) return;
+        const question = chapter && chapter !== content
+          ? `详细讲讲"${content}"（${chapter}）`
+          : `详细讲讲"${content}"`;
+        onAskRef.current?.(question);
       }
     };
     wrap.addEventListener("click", onClick);

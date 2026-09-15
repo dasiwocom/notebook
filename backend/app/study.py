@@ -203,7 +203,8 @@ _STUDY_PROMPTS: dict[str, str] = {
 ```json
 {{"label":"书名","children":[{{"label":"第1章 xxx","children":[{{"label":"概念A"}},{{"label":"概念B"}}]}},{{"label":"第2章 xxx","children":[]}}]}}
 ```
-5. children 为空数组时写 []，不要省略。每个 label 一句话，不超过 20 字。""",
+5. children 为空数组时写 []，不要省略。每个 label 一句话，不超过 20 字。
+6. 重要：直接沿用下面材料中给出的「章节编号」，不要重新编号。材料里写"第3章 xxx"，你的导图里就写"第3章 xxx"，不要改成"第4章"。""",
     "quiz": """你是一个【学习导师】，对标 NotebookLM 的 Quiz 功能。下面会给出《{title}》的章节结构：每章包含章节名、起始页和开篇片段。
 
 任务：基于章节材料出一组选择题。
