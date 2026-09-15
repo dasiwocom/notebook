@@ -1,0 +1,33 @@
+{
+  "appId": "com.notebook.app",
+  "productName": "notebook",
+  "asar": false,
+  "directories": {
+    "output": "dist",
+    "buildResources": "build"
+  },
+  "files": ["main.cjs", "preload.cjs"],
+  "win": {
+    "target": ["portable"],
+    "icon": "build/icon.png"
+  },
+  "extraResources": [
+    {
+      "from": "../backend",
+      "to": "backend",
+      "filter": [
+        "app/**/*.py",
+        "requirements.txt",
+        "data/tocs.json"
+      ]
+    },
+    {
+      "from": "tools/node.exe",
+      "to": "bin/node.exe"
+    },
+    {
+      "from": "../frontend/.next/standalone",
+      "to": "frontend"
+    }
+  ]
+}
