@@ -72,7 +72,7 @@ export function ThemeToggle() {
 
   const item = "flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-[13px] text-zinc-600 transition-colors hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-[#32383e]";
   const subItem = "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[13px] text-zinc-600 transition-colors hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-[#32383e]";
-  const subPanel = "absolute left-full top-0 z-50 ml-1 w-44 rounded-lg border border-black/[0.06] bg-white p-1 shadow-xl dark:border-white/10 dark:bg-[#22262b]";
+  const subPanel = "absolute right-full top-0 z-50 mr-1 w-44 rounded-lg border border-black/[0.06] bg-white p-1 shadow-xl dark:border-white/10 dark:bg-[#22262b]";
 
   return (
     <div ref={ref} className="relative">
