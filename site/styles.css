@@ -46,6 +46,12 @@ main {
   box-shadow: 0 8px 24px -8px rgba(79, 124, 255, 0.5);
 }
 
+.logo {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+}
+
 h1 {
   font-size: 22px;
   font-weight: 600;

@@ -608,6 +608,8 @@ export function ToolsPanel({
       const { id } = await createNote(docId, "");
       setEditingId(id);
       setDraft("");
+      setActiveId(id);
+      setActiveKind("note");
       loadNotes();
     } catch {
       /* ignore */
@@ -705,7 +707,7 @@ export function ToolsPanel({
         /* ── preview view: full-height single item ── */
         <div className={`min-h-0 flex-1 ${isFullPreview ? "overflow-hidden" : "overflow-y-auto"}`}>
 {activeItem.kind === "note" ? (
-          <div className="p-4">
+          <div className="flex h-full flex-col p-4">
             <NoteDetail
               n={activeItem.n}
               editing={editingId === activeItem.n.id}
@@ -723,7 +725,7 @@ export function ToolsPanel({
               }}
             />
           </div>
-        ) : isMindMapOutput(activeItem.o) ? (
+        ) : isMindMapOutput(activeItem.o) || isQuizOutput(activeItem.o) ? (
           <div className="h-full">
             <OutputBody
               o={activeItem.o}
@@ -865,6 +867,16 @@ function isMindMapOutput(o: Output): boolean {
   );
 }
 
+function isQuizOutput(o: Output): boolean {
+  return (
+    Array.isArray(o.structured) &&
+    o.structured.length > 0 &&
+    typeof o.structured[0] === "object" &&
+    o.structured[0] !== null &&
+    "q" in o.structured[0]
+  );
+}
+
 function OutputBody({
   o,
   onCite,
@@ -877,8 +889,7 @@ function OutputBody({
   fill?: boolean;
 }) {
   const isMindMap = isMindMapOutput(o);
-  const isQuiz =
-    Array.isArray(o.structured) && o.structured.length > 0 && "q" in o.structured[0];
+  const isQuiz = isQuizOutput(o);
 
   if (o.status === "error") return <p className="text-sm text-red-500">{o.error}</p>;
   if (isMindMap)

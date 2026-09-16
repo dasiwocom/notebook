@@ -171,7 +171,7 @@ const AssistantCard = memo(function AssistantCard({
   m: ChatMessage;
   onCite: (msgId: string, n: number) => void;
   onSend: (t: string) => void;
-  onRetry: (t: string) => void;
+  onRetry: () => void;
   onSaveToNote: (content: string) => void;
 }) {
   const [openSources, setOpenSources] = useState(false);
@@ -199,7 +199,7 @@ const AssistantCard = memo(function AssistantCard({
         <div className="rounded-[14px] border border-red-200 bg-red-50/70 px-4 py-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-400">
           {m.content}
           <button
-            onClick={() => onRetry(m.content)}
+            onClick={onRetry}
             className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 dark:border-red-800 dark:bg-zinc-900 dark:text-red-400"
             title="Retry"
           >
@@ -548,7 +548,7 @@ export function ChatPanel({
             </div>
           )}
 
-          {messages.map((m) =>
+          {messages.map((m, i) =>
             m.role === "user" ? (
               <div
                 key={m.id}
@@ -562,7 +562,10 @@ export function ChatPanel({
                 m={m}
                 onCite={onCite}
                 onSend={onSend}
-                onRetry={onSend}
+                onRetry={() => {
+                  const lastUser = [...messages.slice(0, i)].reverse().find((x) => x.role === "user");
+                  onSend(lastUser ? lastUser.content : m.content);
+                }}
                 onSaveToNote={onSaveToNote}
               />
             )

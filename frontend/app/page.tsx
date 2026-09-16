@@ -690,7 +690,7 @@ export default function Home() {
       <div
         ref={layoutRef}
         data-mb={mobileTab}
-        className="mb-layout flex min-h-0 flex-1 gap-1 p-2"
+        className="mb-layout flex min-h-0 flex-1 gap-0.5 px-2 pb-2 pt-1"
       >
         <DocumentPanel
           width={docW}

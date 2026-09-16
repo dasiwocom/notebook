@@ -30,3 +30,7 @@ electron/tools/
 .DS_Store
 Thumbs.db
 *.log
+
+# ---- 官网下载产物（安装包不入库，单独上传）----
+site/*.AppImage
+site/*.deb
