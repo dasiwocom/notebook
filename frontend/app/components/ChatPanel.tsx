@@ -22,6 +22,7 @@ import {
 import type { ChatMessage } from "../lib/types";
 import type { ConversationInfo } from "../lib/api";
 import SettingsPanel from "./SettingsPanel";
+import { useI18n } from "../lib/i18n";
 
 type Props = {
   messages: ChatMessage[];
@@ -40,11 +41,12 @@ type Props = {
 };
 
 function CitationLink({ n, onCite }: { n: number; onCite: (n: number) => void }) {
+  const { t } = useI18n();
   return (
     <button
       onClick={() => onCite(n)}
       className="mx-0.5 inline-flex -translate-y-px items-center rounded-full bg-zinc-100 px-[7px] py-0.5 text-[11px] font-semibold tabular-nums text-zinc-600 transition-colors hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
-      title="View source"
+      title={t("chat.viewSource")}
     >
       {n + 1}
     </button>
@@ -174,6 +176,7 @@ const AssistantCard = memo(function AssistantCard({
   onRetry: () => void;
   onSaveToNote: (content: string) => void;
 }) {
+  const { t } = useI18n();
   const [openSources, setOpenSources] = useState(false);
   const [copied, setCopied] = useState(false);
   // 流式期间 content 每 token 都在变；用 useDeferredValue 把昂贵的 Markdown
@@ -201,7 +204,7 @@ const AssistantCard = memo(function AssistantCard({
           <button
             onClick={onRetry}
             className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 dark:border-red-800 dark:bg-zinc-900 dark:text-red-400"
-            title="Retry"
+            title={t("chat.retry")}
           >
             <RotateCcw className="h-3.5 w-3.5" strokeWidth={2} />
             Retry
@@ -299,7 +302,7 @@ const AssistantCard = memo(function AssistantCard({
           <button
             onClick={() => onSaveToNote(m.content)}
             className="press flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium text-zinc-300 transition-colors hover:text-zinc-500 dark:text-zinc-600 dark:hover:text-zinc-300"
-            title="Save to note"
+            title={t("chat.saveToNote")}
           >
             <Save className="h-3.5 w-3.5" strokeWidth={2} />
             Save to note
@@ -311,7 +314,7 @@ const AssistantCard = memo(function AssistantCard({
                 ? "text-emerald-600 dark:text-emerald-400"
                 : "text-zinc-300 hover:text-zinc-500 dark:text-zinc-600 dark:hover:text-zinc-300"
             }`}
-            title="Copy answer"
+            title={t("chat.copy")}
           >
             {copied ? (
               <Check className="h-3.5 w-3.5" strokeWidth={2.5} />
@@ -341,6 +344,7 @@ export function ChatPanel({
   onDeleteConversation,
   onSaveToNote,
 }: Props) {
+  const { t } = useI18n();
   const [input, setInput] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -404,18 +408,18 @@ export function ChatPanel({
           <button
             onClick={() => setConvMenuOpen((v) => !v)}
             className="flex max-w-full items-center gap-1.5 rounded-lg px-1.5 py-1 text-[15px] text-zinc-800 transition-colors hover:bg-black/[0.04] dark:text-zinc-100 dark:hover:bg-white/[0.06]"
-            title="Switch conversation"
+            title={t("chat.switch")}
           >
             <ChevronDown className="h-3.5 w-3.5 shrink-0 text-zinc-400" strokeWidth={2} />
             <span className="truncate">
-              {conversations.find((c) => c.id === activeConvId)?.title ?? "Chat"}
+              {conversations.find((c) => c.id === activeConvId)?.title ?? t("chat.title")}
             </span>
           </button>
           {convMenuOpen && (
             <div className="absolute left-0 top-full z-40 mt-1.5 w-72 max-h-80 overflow-y-auto rounded-xl border border-black/[0.08] bg-white py-1 shadow-xl dark:border-white/10 dark:bg-[#22262b]">
               {conversations.length === 0 && (
                 <p className="px-3 py-2 text-[13px] text-zinc-400">
-                  No conversations yet
+                  {t("chat.noConversations")}
                 </p>
               )}
               {conversations.map((c) => {
@@ -451,7 +455,7 @@ export function ChatPanel({
                         setConvMenuOpen(false);
                       }}
                       className="shrink-0 rounded-md p-1.5 text-zinc-300 opacity-0 transition-opacity hover:bg-black/[0.05] hover:text-red-500 group-hover:opacity-100 dark:hover:bg-white/[0.1]"
-                      title="Delete conversation"
+                      title={t("chat.deleteConv")}
                     >
                       <Trash2 className="h-3.5 w-3.5" strokeWidth={2} />
                     </button>
@@ -475,7 +479,7 @@ export function ChatPanel({
           <button
             onClick={() => setMenuOpen((v) => !v)}
             className="rounded-full p-2 text-zinc-400 transition-colors hover:bg-black/[0.04] hover:text-zinc-600 dark:hover:bg-white/[0.06] dark:hover:text-zinc-200"
-            title="Menu"
+            title={t("chat.menu")}
           >
             <MoreVertical className="h-[18px] w-[18px]" strokeWidth={2} />
           </button>
@@ -538,11 +542,10 @@ export function ChatPanel({
             <div className="mt-24 flex flex-col items-center gap-4 text-center">
               <div className="animate-rise" style={{ animationDelay: "120ms" }}>
                 <h2 className="text-lg font-semibold tracking-tight text-zinc-700 dark:text-zinc-100">
-                  Ask your documents anything
+                  {t("chat.empty.title")}
                 </h2>
                 <p className="mx-auto mt-1.5 max-w-sm text-sm leading-6 text-zinc-400">
-                  After you upload Markdown / PDF files, answers are generated from
-                  your documents with cited sources
+                  {t("chat.empty.hint")}
                 </p>
               </div>
             </div>
@@ -591,7 +594,7 @@ export function ChatPanel({
                 }
               }}
               rows={1}
-              placeholder="Ask your documents…"
+              placeholder={t("chat.placeholder")}
               className="max-h-40 w-full resize-none bg-transparent py-2.5 text-[15px] leading-6 outline-none placeholder:text-zinc-400"
             />
           </div>
@@ -599,7 +602,7 @@ export function ChatPanel({
             <button
               onClick={onStop}
               className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#db372d] text-white transition-colors hover:bg-[#c53026] active:scale-95"
-              title="Stop"
+              title={t("chat.stop")}
             >
               <Square className="h-3.5 w-3.5 fill-current" strokeWidth={2} />
             </button>
@@ -608,7 +611,7 @@ export function ChatPanel({
               onClick={submit}
               disabled={!input.trim()}
               className="press flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#4259ff] text-white shadow-[0_6px_16px_-4px_var(--shadow-btn)] transition-all hover:bg-[#3d54ea] active:scale-95 disabled:bg-[#ebebeb] disabled:text-zinc-500 disabled:shadow-none disabled:hover:bg-[#ebebeb] dark:disabled:bg-[#33373b] dark:disabled:text-white dark:disabled:hover:bg-[#33373b]"
-              title="Send"
+              title={t("chat.send")}
             >
               <SendHorizontal className="h-4 w-4" strokeWidth={2} />
             </button>

@@ -778,7 +778,7 @@ export function ToolsPanel({
           <button
             onClick={create}
             disabled={!docId}
-            title="新建笔记（需先勾选一份文档）"
+            title={t("note.newHint")}
             style={{ "--tool-bg": NOTE_COLOR } as CSSProperties}
             className={`toolbox group flex items-center gap-2.5 rounded-[14px] px-3 py-4 text-left transition-all disabled:opacity-40 ${docId ? "" : "toolbox-muted"}`}
           >
@@ -944,6 +944,7 @@ function OutputCard({
   onCite: (c: Citation) => void;
   onAskNode?: (label: string) => void;
 }) {
+  const { t } = useI18n();
   const [saved, setSaved] = useState(false);
 
   const handleSave = async () => {
@@ -966,7 +967,7 @@ function OutputCard({
         <button
           onClick={inline ? onToggle : onOpen}
           className="flex min-w-0 flex-1 items-center gap-2 text-left"
-          title={inline ? o.expanded ? "Collapse" : "Expand" : "Open preview"}
+          title={inline ? o.expanded ? t("ui.collapse") : t("ui.expand") : t("ui.openPreview")}
         >
           <span
             className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg"
@@ -980,7 +981,7 @@ function OutputCard({
           {o.status === "running" && (
             <span className="flex shrink-0 items-center gap-1.5 text-[11px] text-zinc-400">
               <Loader2 className="h-3 w-3 animate-spin" strokeWidth={2} />
-              Generating
+              {t("chat.thinking")}
             </span>
           )}
           {!inline && (
@@ -1006,7 +1007,7 @@ function OutputCard({
           <button
             onClick={handleSave}
             className="shrink-0 rounded-md p-1 text-zinc-400 transition-colors hover:bg-black/[0.04] hover:text-zinc-600 dark:hover:bg-white/[0.06] dark:hover:text-zinc-200"
-            title="保存为笔记"
+            title={t("note.save")}
           >
             {saved ? (
               <CircleCheck className="h-3.5 w-3.5 text-emerald-500" strokeWidth={2} />
@@ -1064,6 +1065,7 @@ function NoteCard({
   onSave: () => void;
   onRemove: () => void;
 }) {
+  const { t } = useI18n();
   const showBody = expanded || editing;
   return (
     <div className="animate-rise group overflow-hidden rounded-[14px] border border-black/[0.05] bg-white shadow-sm dark:border-white/10 dark:bg-[#1f2327]">
@@ -1080,7 +1082,7 @@ function NoteCard({
             <PenLine className="h-3.5 w-3.5 text-zinc-600 dark:text-zinc-300" strokeWidth={2} />
           </span>
           <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-zinc-700 dark:text-zinc-200">
-            笔记
+            {t("note.title")}
           </span>
           <ChevronRight className="h-3.5 w-3.5 shrink-0 text-zinc-400" strokeWidth={2} />
         </button>
@@ -1113,20 +1115,20 @@ function NoteCard({
                 className="w-full resize-none rounded-lg border border-black/[0.08] bg-[#fbfbfd] px-2.5 py-2 text-[13px] leading-6 text-zinc-800 focus:outline-none focus:ring-1 focus:ring-[#0b57d0] dark:border-white/10 dark:bg-[#1a1d22] dark:text-zinc-200 dark:focus:ring-[#a8c7fa]"
                 rows={4}
                 autoFocus
-                placeholder="写点什么…"
+                placeholder={t("note.placeholder")}
               />
               <div className="mt-1.5 flex justify-end gap-1.5">
                 <button
                   onClick={onCancelEdit}
                   className="rounded-lg px-2.5 py-1 text-[12px] text-zinc-500 hover:bg-black/[0.05] dark:hover:bg-white/[0.08]"
                 >
-                  Cancel
+                  {t("ui.cancel")}
                 </button>
                 <button
                   onClick={onSave}
                   className="rounded-lg bg-[#0b57d0] px-3 py-1 text-[12px] font-medium text-white hover:bg-[#0a4fc4] dark:bg-[#a8c7fa] dark:text-[#1a1d22] dark:hover:bg-[#93b8e8]"
                 >
-                  Save
+                  {t("ui.save")}
                 </button>
               </div>
             </>
@@ -1134,7 +1136,7 @@ function NoteCard({
             <OutputMarkdown content={n.content} />
           ) : (
             <p className="italic text-[13px] text-zinc-400 dark:text-zinc-500">
-              Empty note
+              {t("note.empty")}
             </p>
           )}
         </div>
@@ -1162,6 +1164,7 @@ function OutputDetail({
   onCite: (c: Citation) => void;
   onAskNode?: (label: string) => void;
 }) {
+  const { t } = useI18n();
   const [saved, setSaved] = useState(false);
   const handleSave = async () => {
     await onSaveToNotes(o.content);
@@ -1203,7 +1206,7 @@ function OutputDetail({
             <button
               onClick={handleSave}
               className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-black/[0.04] hover:text-zinc-600 dark:hover:bg-white/[0.06] dark:hover:text-zinc-200"
-              title="保存为笔记"
+              title={t("note.save")}
             >
               {saved ? (
                 <CircleCheck className="h-4 w-4 text-emerald-500" strokeWidth={2} />
@@ -1215,7 +1218,7 @@ function OutputDetail({
           <button
             onClick={onDismiss}
             className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-black/[0.04] hover:text-zinc-600 dark:hover:bg-white/[0.06] dark:hover:text-zinc-200"
-            title="Remove"
+title={t("ui.delete")}
           >
             <X className="h-4 w-4" strokeWidth={2} />
           </button>
@@ -1247,6 +1250,7 @@ function NoteDetail({
   onSave: () => void;
   onRemove: () => void;
 }) {
+  const { t } = useI18n();
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
@@ -1257,7 +1261,7 @@ function NoteDetail({
           <PenLine className="h-5 w-5 text-zinc-600 dark:text-zinc-300" strokeWidth={2} />
         </span>
         <p className="min-w-0 flex-1 truncate text-[14px] font-semibold text-zinc-800 dark:text-zinc-100">
-          笔记
+          {t("note.title")}
         </p>
         <div className="flex shrink-0 items-center gap-0.5">
           {!editing && (
@@ -1287,7 +1291,7 @@ function NoteDetail({
               className="w-full resize-y rounded-lg border border-black/[0.08] bg-[#fbfbfd] px-3 py-2.5 text-[13px] leading-6 text-zinc-800 focus:outline-none focus:ring-1 focus:ring-[#0b57d0] dark:border-white/10 dark:bg-[#1a1d22] dark:text-zinc-200 dark:focus:ring-[#a8c7fa]"
               rows={10}
               autoFocus
-              placeholder="写点什么…"
+              placeholder={t("note.placeholder")}
             />
             <div className="mt-2 flex justify-end gap-1.5">
               <button
@@ -1307,7 +1311,7 @@ function NoteDetail({
         ) : n.content.trim() ? (
           <OutputMarkdown content={n.content} />
         ) : (
-          <p className="italic text-[13px] text-zinc-400 dark:text-zinc-500">Empty note</p>
+          <p className="italic text-[13px] text-zinc-400 dark:text-zinc-500">{t("note.empty")}</p>
         )}
       </div>
     </div>

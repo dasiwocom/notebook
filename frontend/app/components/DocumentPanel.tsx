@@ -29,6 +29,7 @@ import {
   X,
 } from "lucide-react";
 import type { DocumentDetail, DocumentInfo } from "../lib/types";
+import { useI18n } from "../lib/i18n";
 
 const HEADING_RE = /^(#{1,6})\s+(.+?)\s*$/gm;
 const FENCE_RE = /```[\s\S]*?```|~~~[\s\S]*?~~~/g;
@@ -161,6 +162,7 @@ export function DocumentPanel({
   onDelete: (id: string) => void;
   onReindexed?: () => void;
 }) {
+  const { t } = useI18n();
   /* ── preview state ── */
   const [active, setActive] = useState<number>(-1);
   const [flashIdx, setFlashIdx] = useState<number>(-1);
@@ -366,7 +368,7 @@ export function DocumentPanel({
         <button
           onClick={onToggleCollapse}
           className="rounded-full p-2 text-zinc-400 transition-colors hover:bg-black/[0.04] hover:text-zinc-600 dark:hover:bg-white/[0.06] dark:hover:text-zinc-200"
-          title="Expand sources"
+          title={t("ui.expand")}
         >
           <ChevronRight className="h-4 w-4" strokeWidth={2} />
         </button>
@@ -385,7 +387,7 @@ export function DocumentPanel({
       {/* ── top bar ── */}
       <div className="mb-head flex h-12 shrink-0 items-center gap-2 border-b border-black/[0.05] px-4 dark:border-white/10">
         <h2 className="text-[15px] text-zinc-800 dark:text-zinc-100">
-          Sources
+          {t("doc.header")}
         </h2>
         <span className="shrink-0 rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
           {documents.length}
@@ -393,7 +395,7 @@ export function DocumentPanel({
         <button
           onClick={showList ? onToggleCollapse : onBack}
           className="ml-auto rounded-full p-2 text-zinc-400 transition-colors hover:bg-black/[0.04] hover:text-zinc-600 dark:hover:bg-white/[0.06] dark:hover:text-zinc-200"
-          title={showList ? "Collapse sources" : "Back to documents"}
+          title={showList ? t("ui.collapse") : t("doc.back")}
         >
           <Minimize2 className="h-4 w-4" strokeWidth={2} />
         </button>
@@ -410,7 +412,7 @@ export function DocumentPanel({
               className="flex w-full items-center justify-center gap-2 rounded-full border border-black/[0.07] px-4 py-2 text-[13px] font-medium text-zinc-700 transition-all hover:bg-black/[0.04] hover:text-zinc-800 active:scale-[0.98] disabled:opacity-50 dark:border-white/10 dark:text-zinc-300 dark:hover:bg-white/[0.06] dark:hover:text-zinc-100"
             >
               <Plus className="h-4 w-4" strokeWidth={2.2} />
-              {uploading ? "Uploading…" : "Upload document"}
+              {uploading ? t("doc.pagesUploading") : t("doc.upload")}
             </button>
             <input
               ref={fileInputRef}
@@ -439,7 +441,7 @@ export function DocumentPanel({
                   onChange={(e) => setPasteText(e.target.value)}
                   rows={4}
                   autoFocus
-                  placeholder="Paste Markdown / plain text…"
+                  placeholder={t("doc.paste")}
                   className="w-full resize-none rounded-xl border border-black/[0.08] bg-[#fbfbfd] px-3 py-2 text-[13px] leading-6 text-zinc-800 outline-none focus:ring-1 focus:ring-[#0b57d0] dark:border-white/10 dark:bg-[#1a1d22] dark:text-zinc-200 dark:focus:ring-[#a8c7fa]"
                 />
                 <div className="flex justify-end gap-1.5">
@@ -487,7 +489,7 @@ export function DocumentPanel({
               <input
                 value={filter}
                 onChange={(e) => setFilter(e.target.value)}
-                placeholder="Search documents…"
+                placeholder={t("doc.search")}
                 className="min-w-0 flex-1 bg-transparent text-[13px] text-zinc-800 outline-none placeholder:text-zinc-400 dark:text-zinc-200"
               />
               {filter && (
@@ -506,7 +508,7 @@ export function DocumentPanel({
             <div className="relative" ref={sortRef}>
               <button
                 onClick={() => setSortOpen((o) => !o)}
-                title="Sort"
+                title={t("doc.sort")}
                 className="rounded-full p-1.5 text-zinc-400 transition-colors hover:bg-black/[0.04] hover:text-zinc-600 dark:hover:bg-white/[0.06] dark:hover:text-zinc-200"
               >
                 <ArrowUpDown className="h-4 w-4" strokeWidth={2} />
@@ -527,7 +529,7 @@ export function DocumentPanel({
                       }`}
                     >
                       <opt.icon className="h-4 w-4" strokeWidth={2} />
-                      {opt.label}
+                      {t(`doc.sort.${opt.key}`)}
                     </button>
                   ))}
                 </div>
@@ -537,7 +539,7 @@ export function DocumentPanel({
               onClick={onToggleAllConversation}
               className="ml-auto flex items-center gap-1.5 rounded-full pe-1 py-1 text-[12px] font-medium text-zinc-400 transition-colors hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-zinc-200"
             >
-              <span>Select all</span>
+              <span>{t("doc.selectAll")}</span>
               <span
                 className={`flex h-[18px] w-[18px] items-center justify-center border-2 transition-all ${
                   allSelected
@@ -564,9 +566,9 @@ export function DocumentPanel({
                   <NotebookText className="h-5 w-5" strokeWidth={2} />
                 </div>
                 <p className="text-sm leading-6 text-zinc-400 dark:text-zinc-500">
-                  Upload a .md / PDF
+                  {t("doc.empty")}
                   <br />
-                  to start asking
+                  {t("doc.empty.hint")}
                 </p>
               </div>
             )}
@@ -617,10 +619,10 @@ export function DocumentPanel({
                         }`}
                         title={
                           d.status === "error"
-                            ? "Failed"
+                            ? t("doc.status.failed")
                             : d.indexed_chunks < d.chunk_count
-                              ? "Indexing"
-                              : "Indexed"
+                              ? t("doc.status.indexing")
+                              : t("doc.status.indexed")
                         }
                       />
                     )}
@@ -630,7 +632,7 @@ export function DocumentPanel({
                         onDelete(d.id);
                       }}
                       className="shrink-0 rounded-full p-1.5 text-zinc-400 opacity-0 transition-all hover:bg-red-50 hover:text-red-600 group-hover:opacity-100 dark:hover:bg-[#3a3139] dark:hover:text-red-400"
-                      title="Delete document"
+                      title={t("doc.delete")}
                     >
                       <Trash2 className="h-3.5 w-3.5" strokeWidth={2} />
                     </button>
@@ -646,8 +648,8 @@ export function DocumentPanel({
                       }`}
                       title={
                         conversationIds.has(d.id)
-                          ? "Remove from chat"
-                          : "Add to chat"
+                          ? t("doc.removeFromChat")
+                          : t("doc.addToChat")
                       }
                     >
                       <Check className="h-3 w-3" strokeWidth={3} />
@@ -666,7 +668,7 @@ export function DocumentPanel({
           <button
             onClick={onBack}
             className="absolute left-3 top-3 z-20 flex h-8 w-8 items-center justify-center rounded-full border border-black/10 bg-white/90 text-zinc-600 shadow-sm backdrop-blur min-[1200px]:hidden dark:border-white/10 dark:bg-[#22262b]/90 dark:text-zinc-300"
-            title="Back to documents"
+            title={t("doc.back")}
           >
             <ArrowLeft className="h-4 w-4" strokeWidth={2} />
           </button>
@@ -724,15 +726,15 @@ export function DocumentPanel({
                   strokeWidth={2}
                 />
                 <p className="text-sm text-zinc-400 dark:text-zinc-500">
-                  Processing your uploaded document
+                  {t("doc.processing")}
                   <br />
-                  You can view & ask once it's ready
+                  {t("doc.processing.hint")}
                 </p>
               </div>
             ) : doc.status === "error" ? (
               <div className="flex h-full flex-col items-center justify-center gap-2.5 text-center">
                 <p className="text-sm text-zinc-400 dark:text-zinc-500">
-                  Document processing failed
+                  {t("doc.status.failed")}
                 </p>
                 <button
                   onClick={retry}
@@ -743,15 +745,15 @@ export function DocumentPanel({
                     className={`h-3.5 w-3.5 ${retrying ? "animate-spin" : ""}`}
                     strokeWidth={2}
                   />
-                  Retry
+{retrying ? t("doc.reindexing") : t("doc.retry")}
                 </button>
               </div>
             ) : isPdf ? (
               <div className="space-y-4">
                 {pageCount === 0 ? (
-                  <p className="pt-8 text-center text-sm text-zinc-400">
-                    Pages uploading — will appear shortly…
-                  </p>
+                  <p className="text-sm text-zinc-400 dark:text-zinc-500">
+                  {t("doc.pagesUploading")}
+                </p>
                 ) : (
                   Array.from({ length: pageCount }, (_, i) => i + 1).map(
                     (n) => (
