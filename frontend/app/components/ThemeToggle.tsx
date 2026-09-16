@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Moon, Settings, Sun } from "lucide-react";
+import { ChevronRight, Moon, Settings, Sun } from "lucide-react";
 import { useI18n } from "../lib/i18n";
 import SettingsPanel from "./SettingsPanel";
 
 type Mode = "light" | "dark";
+type Submenu = "lang" | "theme" | "chat" | null;
 
 function apply(mode: Mode) {
   document.documentElement.classList.toggle("dark", mode === "dark");
@@ -23,6 +24,7 @@ export function ThemeToggle() {
   const { lang, setLang, t } = useI18n();
   const [mode, setMode] = useState<Mode>("light");
   const [open, setOpen] = useState(false);
+  const [sub, setSub] = useState<Submenu>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -63,7 +65,14 @@ export function ThemeToggle() {
     });
   };
 
-  const row = "flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left text-[13px] text-zinc-600 transition-colors hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-[#32383e]";
+  const close = () => {
+    setOpen(false);
+    setSub(null);
+  };
+
+  const item = "flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-[13px] text-zinc-600 transition-colors hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-[#32383e]";
+  const subItem = "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[13px] text-zinc-600 transition-colors hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-[#32383e]";
+  const subPanel = "absolute left-full top-0 z-50 ml-1 w-44 rounded-lg border border-black/[0.06] bg-white p-1 shadow-xl dark:border-white/10 dark:bg-[#22262b]";
 
   return (
     <div ref={ref} className="relative">
@@ -78,71 +87,91 @@ export function ThemeToggle() {
       </button>
 
       {open && (
-        <div
-          role="menu"
-          className="absolute right-0 top-full z-50 mt-1.5 w-64 rounded-xl border border-black/[0.06] bg-white p-2 shadow-xl dark:border-white/10 dark:bg-[#22262b]"
-        >
-          <p className="px-2 pb-1 pt-1 text-[11px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
-            Appearance
-          </p>
-          <div className="flex items-center justify-between rounded-lg px-2 py-1.5 text-[13px] text-zinc-600 dark:text-zinc-300">
-            <span>{t("settings.appearance")}</span>
-            <div className="flex rounded-full bg-zinc-100 p-0.5 dark:bg-[#2a2d33]">
+        <div className="absolute right-0 top-full z-50 mt-1.5 w-52 rounded-lg border border-black/[0.06] bg-white p-1 shadow-xl dark:border-white/10 dark:bg-[#22262b]">
+          <button onClick={() => setSub(sub === "lang" ? null : "lang")} className={item}>
+            <span>{t("settings.dropdown.language")}</span>
+            <span className="flex items-center gap-1">
+              <span className="text-[12px] text-zinc-400 dark:text-zinc-500">
+                {lang === "zh" ? "简体中文" : "English"}
+              </span>
+              <ChevronRight className="h-3.5 w-3.5 text-zinc-400" strokeWidth={2} />
+            </span>
+          </button>
+          {sub === "lang" && (
+            <div className={subPanel}>
+              <button
+                onClick={() => {
+                  setLang("zh");
+                  close();
+                }}
+                className={`${subItem} ${lang === "zh" ? "font-medium text-zinc-900 dark:text-zinc-100" : ""}`}
+              >
+                简体中文
+              </button>
+              <button
+                onClick={() => {
+                  setLang("en");
+                  close();
+                }}
+                className={`${subItem} ${lang === "en" ? "font-medium text-zinc-900 dark:text-zinc-100" : ""}`}
+              >
+                English
+              </button>
+            </div>
+          )}
+
+          <button onClick={() => setSub(sub === "theme" ? null : "theme")} className={item}>
+            <span>{t("settings.dropdown.theme")}</span>
+            <span className="flex items-center gap-1">
+              {mode === "dark" ? (
+                <Moon className="h-3.5 w-3.5 text-zinc-400" strokeWidth={2} />
+              ) : (
+                <Sun className="h-3.5 w-3.5 text-zinc-400" strokeWidth={2} />
+              )}
+              <span className="text-[12px] text-zinc-400 dark:text-zinc-500">
+                {mode === "dark" ? t("settings.appearance.dark") : t("settings.appearance.light")}
+              </span>
+              <ChevronRight className="h-3.5 w-3.5 text-zinc-400" strokeWidth={2} />
+            </span>
+          </button>
+          {sub === "theme" && (
+            <div className={subPanel}>
               <button
                 onClick={() => set("light")}
-                className={`flex items-center gap-1 rounded-full px-2 py-1 text-[11px] transition-colors ${
-                  mode === "light"
-                    ? "bg-white text-zinc-900 shadow-sm dark:bg-[#37383b] dark:text-zinc-50"
-                    : "text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
-                }`}
+                className={`${subItem} ${mode === "light" ? "font-medium text-zinc-900 dark:text-zinc-100" : ""}`}
               >
-                <Sun className="h-3 w-3" strokeWidth={2} />
+                <Sun className="h-3.5 w-3.5" strokeWidth={2} />
                 {t("settings.appearance.light")}
               </button>
               <button
                 onClick={() => set("dark")}
-                className={`flex items-center gap-1 rounded-full px-2 py-1 text-[11px] transition-colors ${
-                  mode === "dark"
-                    ? "bg-white text-zinc-900 shadow-sm dark:bg-[#37383b] dark:text-zinc-50"
-                    : "text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
-                }`}
+                className={`${subItem} ${mode === "dark" ? "font-medium text-zinc-900 dark:text-zinc-100" : ""}`}
               >
-                <Moon className="h-3 w-3" strokeWidth={2} />
+                <Moon className="h-3.5 w-3.5" strokeWidth={2} />
                 {t("settings.appearance.dark")}
               </button>
             </div>
-          </div>
+          )}
 
-          <p className="px-2 pb-1 pt-2.5 text-[11px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
-            Language
-          </p>
-          <div className="px-2 pb-1">
-            <select
-              value={lang}
-              onChange={(e) => {
-                setLang(e.target.value as "zh" | "en");
-                setOpen(false);
-              }}
-              className="h-7 w-full rounded-lg border border-black/[0.07] bg-zinc-50 px-2 text-[12px] text-zinc-700 outline-none transition-colors focus:border-zinc-300 dark:border-white/10 dark:bg-zinc-800/60 dark:text-zinc-200"
-            >
-              <option value="zh">简体中文</option>
-              <option value="en">English</option>
-            </select>
-          </div>
-
-          <p className="px-2 pb-1 pt-2.5 text-[11px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
-            {t("chat.title")}
-          </p>
-          <button
-            onClick={() => {
-              setSettingsOpen(true);
-              setOpen(false);
-            }}
-            className={row}
-          >
-            <Settings className="h-4 w-4" strokeWidth={2} />
-            {t("settings.title")}
+          <button onClick={() => setSub(sub === "chat" ? null : "chat")} className={item}>
+            <span>{t("settings.dropdown.chat")}</span>
+            <ChevronRight className="h-3.5 w-3.5 text-zinc-400" strokeWidth={2} />
           </button>
+          {sub === "chat" && (
+            <div className={subPanel}>
+              <button
+                onClick={() => {
+                  setOpen(false);
+                  setSub(null);
+                  setSettingsOpen(true);
+                }}
+                className={subItem}
+              >
+                <Settings className="h-3.5 w-3.5" strokeWidth={2} />
+                {t("settings.title")}
+              </button>
+            </div>
+          )}
         </div>
       )}
 
