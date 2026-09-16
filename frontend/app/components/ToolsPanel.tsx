@@ -24,6 +24,7 @@ import {
   Zap,
 } from "lucide-react";
 import { chatStream, createNote, deleteNote, listNotes, listStudies, syncStudies, updateNote } from "../lib/api";
+import { useI18n } from "../lib/i18n";
 import type { Citation } from "../lib/types";
 
 type Tool = {
@@ -398,6 +399,7 @@ export function ToolsPanel({
   const [collapsedNotes, setCollapsedNotes] = useState<Set<string>>(new Set());
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeKind, setActiveKind] = useState<"output" | "note" | null>(null);
+  const { t } = useI18n();
   const abortRef = useRef<Map<string, AbortController>>(new Map());
   const scrollRef = useRef<HTMLDivElement>(null);
   const outputsRef = useRef<Output[]>([]);
@@ -459,7 +461,11 @@ export function ToolsPanel({
     if (!convId || !hydratedRef.current) return;
     const t = window.setTimeout(() => {
       const done = outputsRef.current
-        .filter((o) => o.status === "done" && o.content.trim().length > 0)
+        .filter(
+          (o) =>
+            o.status === "done" &&
+            (o.content.trim().length > 0 || o.structured != null)
+        )
         .map((o) => ({
           id: o.id,
           label: o.label,
@@ -683,7 +689,7 @@ export function ToolsPanel({
       style={{ width }}
     >
       <div className="mb-head flex h-12 shrink-0 items-center gap-2 border-b border-black/[0.05] px-4 dark:border-white/10">
-        <h2 className="text-[15px] text-zinc-800 dark:text-zinc-100">Studio</h2>
+        <h2 className="text-[15px] text-zinc-800 dark:text-zinc-100">{t("ui.studio")}</h2>
         {activeItem ? (
           <button
             onClick={exitPreview}
@@ -778,7 +784,7 @@ export function ToolsPanel({
           >
             <PenLine className="h-4 w-4 shrink-0 text-zinc-700" strokeWidth={2} />
             <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-zinc-700">
-              Note
+              {t("ui.note")}
             </span>
             <ChevronRight className="h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform group-hover:translate-x-0.5" strokeWidth={2} />
           </button>
@@ -789,7 +795,7 @@ export function ToolsPanel({
         <div className="mt-4 border-t border-black/[0.05] pt-3 dark:border-white/10">
           <div className="mb-2.5 flex items-center justify-between px-1">
             <span className="text-[12px] font-medium tracking-wide text-zinc-400 dark:text-zinc-500">
-              产出 · Outputs
+              {t("ui.outputs")}
             </span>
           </div>
 

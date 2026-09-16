@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { Check, LoaderCircle, X } from "lucide-react";
 import { getSettings, saveSettings, testSettings } from "../lib/api";
+import { useI18n, type Lang } from "../lib/i18n";
 
 type Field = {
   label: string;
@@ -117,6 +118,7 @@ export default function SettingsPanel({
   onClose: () => void;
   onSaved: (msg: string) => void;
 }) {
+  const { lang, setLang, t } = useI18n();
   const [s, setS] = useState<Record<string, string>>({});
   const [dirty, setDirty] = useState<Set<string>>(new Set());
   const [keySet, setKeySet] = useState<{ llm: boolean; openai: boolean }>({
@@ -194,12 +196,12 @@ export default function SettingsPanel({
       >
         <div className="flex h-12 shrink-0 items-center justify-between border-b border-black/[0.05] px-5 dark:border-white/10">
           <h2 className="text-[13px] font-semibold text-zinc-700 dark:text-zinc-200">
-            Settings
+            {t("settings.title")}
           </h2>
           <button
             onClick={onClose}
             className="rounded-full p-2 text-zinc-400 transition-colors hover:bg-black/[0.04] hover:text-zinc-600 dark:hover:bg-white/[0.06] dark:hover:text-zinc-200"
-            title="Close"
+            title={t("ui.close")}
           >
             <X className="h-4 w-4" strokeWidth={2} />
           </button>
@@ -315,6 +317,61 @@ export default function SettingsPanel({
                 setValue={set("MMR_LAMBDA")}
               />
             </Section>
+
+            <Section
+              title={t("settings.language")}
+              hint={t("settings.language.hint")}
+            >
+              <label className="flex items-center gap-3 text-sm">
+                <span className="w-28 shrink-0 text-zinc-500 dark:text-zinc-400">
+                  {t("settings.language")}
+                </span>
+                <select
+                  value={lang}
+                  onChange={(e) => setLang(e.target.value as Lang)}
+                  className="h-8 w-full min-w-0 flex-1 rounded-lg border border-black/[0.07] bg-zinc-50 px-3 text-[13px] text-zinc-800 outline-none transition-colors focus:border-zinc-300 focus:bg-white dark:border-white/10 dark:bg-zinc-800/60 dark:text-zinc-100 dark:focus:bg-zinc-800"
+                >
+                  <option value="zh">简体中文</option>
+                  <option value="en">English</option>
+                </select>
+              </label>
+            </Section>
+
+            <Section
+              title={t("settings.plugins")}
+              hint={t("settings.plugins.hint")}
+            >
+              <p className="text-xs text-zinc-400 dark:text-zinc-500">
+                {t("settings.plugins.coming")}
+              </p>
+            </Section>
+
+            <Section
+              title={t("settings.panel.docs")}
+              hint={t("settings.panel.docs.hint")}
+            >
+              <p className="text-xs text-zinc-400 dark:text-zinc-500">
+                {t("settings.panel.coming")}
+              </p>
+            </Section>
+
+            <Section
+              title={t("settings.panel.chat")}
+              hint={t("settings.panel.chat.hint")}
+            >
+              <p className="text-xs text-zinc-400 dark:text-zinc-500">
+                {t("settings.panel.coming")}
+              </p>
+            </Section>
+
+            <Section
+              title={t("settings.panel.studio")}
+              hint={t("settings.panel.studio.hint")}
+            >
+              <p className="text-xs text-zinc-400 dark:text-zinc-500">
+                {t("settings.panel.coming")}
+              </p>
+            </Section>
           </div>
 
           {result && (
@@ -335,19 +392,19 @@ export default function SettingsPanel({
             onClick={onClose}
             className="rounded-full px-4 py-2 text-[13px] font-medium text-zinc-500 transition-colors hover:bg-black/[0.04] dark:text-zinc-400 dark:hover:bg-white/[0.06]"
           >
-            Cancel
+            {t("settings.cancel")}
           </button>
           <button
             onClick={save}
             disabled={saving}
-            className="press flex items-center gap-1.5 rounded-full bg-black px-4 py-2 text-[13px] font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
+            className="press flex items-center gap-1.5 rounded-full border border-black/[0.06] bg-[var(--card)] px-4 py-2 text-[13px] font-medium text-zinc-700 transition-colors hover:bg-zinc-100 disabled:opacity-50 dark:border-white/10 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
           >
             {saving ? (
               <LoaderCircle className="h-3.5 w-3.5 animate-spin" strokeWidth={2} />
             ) : (
               <Check className="h-3.5 w-3.5" strokeWidth={2} />
             )}
-            Save settings
+            {t("settings.save")}
           </button>
         </div>
       </div>
