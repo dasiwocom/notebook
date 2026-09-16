@@ -336,42 +336,6 @@ export default function SettingsPanel({
                 </select>
               </label>
             </Section>
-
-            <Section
-              title={t("settings.plugins")}
-              hint={t("settings.plugins.hint")}
-            >
-              <p className="text-xs text-zinc-400 dark:text-zinc-500">
-                {t("settings.plugins.coming")}
-              </p>
-            </Section>
-
-            <Section
-              title={t("settings.panel.docs")}
-              hint={t("settings.panel.docs.hint")}
-            >
-              <p className="text-xs text-zinc-400 dark:text-zinc-500">
-                {t("settings.panel.coming")}
-              </p>
-            </Section>
-
-            <Section
-              title={t("settings.panel.chat")}
-              hint={t("settings.panel.chat.hint")}
-            >
-              <p className="text-xs text-zinc-400 dark:text-zinc-500">
-                {t("settings.panel.coming")}
-              </p>
-            </Section>
-
-            <Section
-              title={t("settings.panel.studio")}
-              hint={t("settings.panel.studio.hint")}
-            >
-              <p className="text-xs text-zinc-400 dark:text-zinc-500">
-                {t("settings.panel.coming")}
-              </p>
-            </Section>
           </div>
 
           {result && (

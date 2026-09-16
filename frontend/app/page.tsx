@@ -686,7 +686,12 @@ export default function Home() {
             Dasiwo Notebook
           </p>
         </div>
-        <ThemeToggle />
+        <ThemeToggle
+          leftCollapsed={docCollapsed}
+          rightCollapsed={sbCollapsed}
+          onToggleLeft={() => setDocCollapsed((v) => !v)}
+          onToggleRight={() => setSbCollapsed((v) => !v)}
+        />
       </header>
 
       <div

@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronRight, Moon, Settings, Sun } from "lucide-react";
+import {
+  ChevronRight,
+  Moon,
+  PanelLeft,
+  PanelRight,
+  Settings,
+  Sun,
+} from "lucide-react";
 import { useI18n } from "../lib/i18n";
 import SettingsPanel from "./SettingsPanel";
 
@@ -20,7 +27,17 @@ function readMode(): Mode {
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
-export function ThemeToggle() {
+export function ThemeToggle({
+  leftCollapsed,
+  rightCollapsed,
+  onToggleLeft,
+  onToggleRight,
+}: {
+  leftCollapsed?: boolean;
+  rightCollapsed?: boolean;
+  onToggleLeft?: () => void;
+  onToggleRight?: () => void;
+}) {
   const { lang, setLang, t } = useI18n();
   const [mode, setMode] = useState<Mode>("light");
   const [open, setOpen] = useState(false);
@@ -74,6 +91,9 @@ export function ThemeToggle() {
   const subItem = "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[13px] text-zinc-600 transition-colors hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-[#32383e]";
   const subPanel = "absolute right-full top-0 z-50 mr-1 w-44 rounded-lg border border-black/[0.06] bg-white p-1 shadow-xl dark:border-white/10 dark:bg-[#22262b]";
 
+  const panelValue = (collapsed: boolean | undefined) =>
+    collapsed ? t("ui.collapse") : t("ui.expand");
+
   return (
     <div ref={ref} className="relative">
       <button
@@ -87,7 +107,39 @@ export function ThemeToggle() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-1.5 w-52 rounded-lg border border-black/[0.06] bg-white p-1 shadow-xl dark:border-white/10 dark:bg-[#22262b]">
+        <div className="absolute right-0 top-full z-50 mt-1.5 w-56 rounded-lg border border-black/[0.06] bg-white p-1 shadow-xl dark:border-white/10 dark:bg-[#22262b]">
+          <button
+            onClick={() => {
+              onToggleLeft?.();
+              close();
+            }}
+            className={item}
+          >
+            <span className="flex items-center gap-2">
+              <PanelLeft className="h-4 w-4 text-zinc-400" strokeWidth={2} />
+              {t("settings.dropdown.left")}
+            </span>
+            <span className="text-[12px] text-zinc-400 dark:text-zinc-500">
+              {panelValue(leftCollapsed)}
+            </span>
+          </button>
+
+          <button
+            onClick={() => {
+              onToggleRight?.();
+              close();
+            }}
+            className={item}
+          >
+            <span className="flex items-center gap-2">
+              <PanelRight className="h-4 w-4 text-zinc-400" strokeWidth={2} />
+              {t("settings.dropdown.right")}
+            </span>
+            <span className="text-[12px] text-zinc-400 dark:text-zinc-500">
+              {panelValue(rightCollapsed)}
+            </span>
+          </button>
+
           <button onClick={() => setSub(sub === "lang" ? null : "lang")} className={item}>
             <span>{t("settings.dropdown.language")}</span>
             <span className="flex items-center gap-1">
