@@ -11,7 +11,8 @@ import { ChatPanel } from "./components/ChatPanel";
 import { DocumentPanel } from "./components/DocumentPanel";
 import { ToolsPanel } from "./components/ToolsPanel";
 import { ThemeToggle } from "./components/ThemeToggle";
-import { X } from "lucide-react";
+import SettingsPanel from "./components/SettingsPanel";
+import { Settings, X } from "lucide-react";
 import type { HighlightReq } from "./components/DocumentPanel";
 import {
   chatStream,
@@ -28,6 +29,7 @@ import {
 } from "./lib/api";
 import type { ConversationInfo, LoadedMessage, PersistentMessage } from "./lib/api";
 import type { ChatMessage, Citation, DocumentDetail, DocumentInfo } from "./lib/types";
+import { useI18n } from "./lib/i18n";
 
 const SIDEBAR_MIN = 220;
 const SIDEBAR_MAX = 1280;
@@ -119,6 +121,7 @@ function Divider({
 }
 
 export default function Home() {
+  const { t } = useI18n();
   const [documents, setDocuments] = useState<DocumentInfo[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
@@ -132,6 +135,7 @@ export default function Home() {
   const [docW, setDocW] = useState(320);
   const [sbCollapsed, setSbCollapsed] = useState(false);
   const [docCollapsed, setDocCollapsed] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [conversationIds, setConversationIds] = useState<Set<string>>(new Set());
   const [convs, setConvs] = useState<ConversationInfo[]>([]);
   const [convId, setConvId] = useState<string | null>(null);
@@ -684,7 +688,17 @@ export default function Home() {
             Dasiwo Notebook
           </p>
         </div>
-        <ThemeToggle />
+        <div className="flex items-center gap-1.5">
+          <ThemeToggle />
+          <button
+            onClick={() => setSettingsOpen(true)}
+            title="Settings"
+            aria-label="Settings"
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-black/[0.05] bg-white text-zinc-500 transition-all hover:text-zinc-800 dark:border-white/10 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+          >
+            <Settings className="h-3.5 w-3.5" strokeWidth={2} />
+          </button>
+        </div>
       </header>
 
       <div
@@ -769,9 +783,9 @@ export default function Home() {
       <nav className="mb-nav flex h-12 shrink-0 items-stretch border-t border-black/[0.05] px-2 min-[1200px]:hidden dark:border-white/10">
         {(
           [
-            { key: "docs", label: "Sources" },
-            { key: "chat", label: "Chat" },
-            { key: "tools", label: "Studio" },
+            { key: "docs", label: t("doc.header") },
+            { key: "chat", label: t("chat.title") },
+            { key: "tools", label: t("ui.studio") },
           ] as const
         ).map((t) => {
           const active = mobileTab === t.key;
@@ -801,6 +815,16 @@ export default function Home() {
           );
         })}
       </nav>
+
+      {settingsOpen && (
+        <SettingsPanel
+          onClose={() => setSettingsOpen(false)}
+          onSaved={(msg) => {
+            setNotice(msg);
+            setTimeout(() => setNotice(null), 3000);
+          }}
+        />
+      )}
     </div>
   );
 }
