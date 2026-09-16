@@ -125,12 +125,18 @@ function venvPython(venvDir) {
   return path.join(venvDir, IS_WIN ? "Scripts" : "bin", IS_WIN ? "python.exe" : "python");
 }
 
-// 捆绑的便携 Python（python-build-standalone）：解压后结构 python/bin/python3，
-// 依赖装在 python/pydeps，是 linux 打包的默认后端运行时，完全自包含。
+// 捆绑的便携 Python（python-build-standalone）：完全自包含，普通用户机无需装 Python。
+// 结构不跨平台统一：
+//   - Linux: python/bin/python3
+//   - Windows: python/python/python.exe（package.win.json 把 tools/python-win → python）
+// 依赖一律装在 python/pydeps。
 function portablePython() {
   const base = path.join(ROOT, "python");
-  const py = path.join(base, "bin", "python3");
-  return fs.existsSync(py) ? { py, pydeps: path.join(base, "pydeps") } : null;
+  const winPy = path.join(base, "python", "python.exe");
+  if (fs.existsSync(winPy)) return { py: winPy, pydeps: path.join(base, "pydeps") };
+  const linuxPy = path.join(base, "bin", "python3");
+  if (fs.existsSync(linuxPy)) return { py: linuxPy, pydeps: path.join(base, "pydeps") };
+  return null;
 }
 
 function findSystemPython() {

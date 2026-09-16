@@ -92,17 +92,28 @@ export type HighlightReq = {
 
 const isPdfName = (name: string) => name.toLowerCase().endsWith(".pdf");
 
+function apiBase() {
+  const injected = (globalThis as any).electronAPI?.apiBase;
+  if (injected) return injected;
+  return `http://${globalThis.location?.hostname ?? "localhost"}:8000`;
+}
+
+function authHeaders(extra?: Record<string, string>): Record<string, string> {
+  const tok = (globalThis as any).electronAPI?.token;
+  if (!tok) return extra ?? {};
+  return { Authorization: `Bearer ${tok}`, ...(extra ?? {}) };
+}
+
 function pageImageUrl(docId: string, n: number) {
-  return `http://${apiHost()}:8000/api/documents/${docId}/pages/${n}`;
+  const tok = (globalThis as any).electronAPI?.token;
+  const t = tok ? `?token=${encodeURIComponent(String(tok))}` : "";
+  return `${apiBase()}/api/documents/${docId}/pages/${n}${t}`;
 }
 function pageMetaUrl(docId: string) {
-  return `http://${apiHost()}:8000/api/documents/${docId}/pages`;
+  return `${apiBase()}/api/documents/${docId}/pages`;
 }
 function pageHighlightUrl(docId: string, n: number) {
-  return `http://${apiHost()}:8000/api/documents/${docId}/pages/${n}/highlights`;
-}
-function apiHost() {
-  return globalThis.location?.hostname ?? "localhost";
+  return `${apiBase()}/api/documents/${docId}/pages/${n}/highlights`;
 }
 
 type SortKey = "recent" | "name" | "char";
@@ -204,7 +215,7 @@ export function DocumentPanel({
       return;
     }
     let live = true;
-    fetch(pageMetaUrl(doc.id))
+    fetch(pageMetaUrl(doc.id), { headers: authHeaders() })
       .then((r) => r.json())
       .then((d) => {
         if (live) setPageCount(Number(d.count) || 0);
@@ -304,7 +315,9 @@ export function DocumentPanel({
     const params = new URLSearchParams();
     if (query) params.set("q", query);
     if (snippet) params.set("snippet", snippet);
-    fetch(`${pageHighlightUrl(doc.id, pg)}?${params.toString()}`)
+    fetch(`${pageHighlightUrl(doc.id, pg)}?${params.toString()}`, {
+      headers: authHeaders(),
+    })
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (!live || !d) return;
@@ -334,8 +347,8 @@ export function DocumentPanel({
     setRetrying(true);
     try {
       await fetch(
-        `http://${apiHost()}:8000/api/documents/${doc.id}/reindex`,
-        { method: "POST" }
+        `${apiBase()}/api/documents/${doc.id}/reindex`,
+        { method: "POST", headers: authHeaders() }
       );
       onReindexed?.();
     } catch {

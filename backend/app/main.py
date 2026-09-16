@@ -2,6 +2,7 @@ import json
 import re
 import threading
 from typing import AsyncIterator
+from urllib.parse import unquote
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -34,7 +35,23 @@ class TokenAuthMiddleware:
             if path.startswith("/api") and path != "/api/health":
                 headers = dict(scope.get("headers", []))
                 auth = headers.get(b"authorization", b"").decode("latin-1")
-                if auth != f"Bearer {config.NOTEBOOK_TOKEN}":
+                ok = auth == f"Bearer {config.NOTEBOOK_TOKEN}"
+                if not ok:
+                    # 兜底：<img> 等无法携带 header 的请求可用 query token。
+                    # 仅当 header 缺位（或未通过）时才读 query，避免降低 header 语义。
+                    bare = auth == "" and scope["query_string"]
+                    if bare:
+                        qs = scope["query_string"].decode("latin-1")
+                        m = re.search(r"(?:^|&)token=([^&]*)", qs)
+                        if m:
+                            try:
+                                ok = (
+                                    m.group(1) == config.NOTEBOOK_TOKEN
+                                    or unquote(m.group(1)) == config.NOTEBOOK_TOKEN
+                                )
+                            except Exception:
+                                ok = False
+                if not ok:
                     resp = JSONResponse({"detail": "unauthorized"}, status_code=401)
                     await resp(scope, receive, send)
                     return

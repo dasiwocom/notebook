@@ -9,6 +9,6 @@ onnxruntime==1.30.0
 pymupdf==1.28.2
 rapidocr-onnxruntime==1.2.3
 
-# 可选：语义重排（bge-reranker）。未安装时自动回退到词汇/MMR 检索。
-# 若启用请先 `pip install infinity-emb`，并按实际版本锁定。
+# Optional: semantic rerank (bge-reranker). If not installed, falls back to keyword/MMR.
+# To enable, run `pip install infinity-emb` first and pin the actual version.
 # infinity-emb

@@ -28,6 +28,10 @@
     {
       "from": "../frontend/.next/standalone",
       "to": "frontend"
+    },
+    {
+      "from": "tools/python-win",
+      "to": "python"
     }
   ]
 }

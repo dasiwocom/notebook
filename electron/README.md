@@ -17,11 +17,19 @@ cd electron
 npm start          # 开发态：直接拉源码里的 backend/.venv + frontend/.next/standalone
 ```
 
+## 打包（重要：遵守 AGENTS.md「打包铁律」）
+
+Linux 有 wine 时可直接 `npm run dist`；Windows 包必须在 Windows 主机执行
+`npx electron-builder --win portable --config package.win.json`（见 `build-win.ps1`）。
+Linux 上构建 Windows 包会报 `wine is required`。
+
 ## 跨平台机制（关键）
 
-- **后端 Python**：优先用捆绑的 `.venv`（Linux AppImage 自包含）；没有时（Win/mac 包不捆
-  Linux venv）首次运行用**系统 Python** 在 `app.getPath("userData")/backend-venv` 建 venv
-  并 `pip install -r requirements.txt`，之后直接复用。目标机器需装 Python 3.13。
+- **后端 Python**：打包后**必须完全自包含**，不允许依赖用户机的 Python。
+  Linux 打包捆绑 `tools/python/`（bin/python3 + pydeps）；Windows 打包捆绑
+  `tools/python-win/`（python/python.exe + pydeps），经 `package.win.json`
+  extraResources 复制进 `resources/python/`。`portablePython()` 同时识别两种结构，
+  找不到时宁报错也不能静默退到系统 python（普通用户机没有 Python，静默退必然失败）。
 - **Node**：Windows 用 `bin/node.exe`、Linux 用 `bin/node`，都没有就退回系统 node。
 - **数据目录**：DB/PDF 页图/OCR 都写到 `userData`（Linux `~/.config/notebook`、
   Win `%APPDATA%\notebook`），不写进安装目录/AppImage；上传的文档因此跨会话保留。
@@ -50,14 +58,14 @@ npm run dist:mac    # macOS dmg（必须在 macOS 上构建，Xcode 许可限制
 
 ## 产物
 
-- `dist/notebook-1.0.0.AppImage`（~400M，含 Linux venv，离线可用）
-- `dist/notebook-1.0.0-win64-portable.zip`（~180M，不带 venv，首次运行自动装依赖）
+- `dist/notebook-1.0.0.AppImage`（~400M，含 Linux portable Python，离线可用）
+- Windows：`dist/<productName>-1.0.0<主版本>.exe`（portable，含
+  `resources/python/python/python.exe` + `resources/python/pydeps`，双击即用）
 
 ## 已知待完善（todo）
 
 - 应用图标（当前用 Electron 默认图标）
 - Windows 正式 NSIS 安装包（需 windows 主机或 wine）
 - macOS 签名/公证
-- Win/mac 包可尝试在对应平台捆绑成型的 venv（免去首启 pip 安装）
-- 首次启动的"正在安装后端依赖"进度提示（当前把日志写 `%TEMP%/notebook-electron.log`）
+- 首次启动的"正在解压/启动"进度提示（当前把日志写 `%TEMP%/notebook-electron.log`）
 - 单实例锁（避免同时开两个实例各起一套服务）
