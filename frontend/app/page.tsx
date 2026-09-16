@@ -11,8 +11,7 @@ import { ChatPanel } from "./components/ChatPanel";
 import { DocumentPanel } from "./components/DocumentPanel";
 import { ToolsPanel } from "./components/ToolsPanel";
 import { ThemeToggle } from "./components/ThemeToggle";
-import SettingsPanel from "./components/SettingsPanel";
-import { Settings, X } from "lucide-react";
+import { X } from "lucide-react";
 import type { HighlightReq } from "./components/DocumentPanel";
 import {
   chatStream,
@@ -135,7 +134,6 @@ export default function Home() {
   const [docW, setDocW] = useState(320);
   const [sbCollapsed, setSbCollapsed] = useState(false);
   const [docCollapsed, setDocCollapsed] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [conversationIds, setConversationIds] = useState<Set<string>>(new Set());
   const [convs, setConvs] = useState<ConversationInfo[]>([]);
   const [convId, setConvId] = useState<string | null>(null);
@@ -688,17 +686,7 @@ export default function Home() {
             Dasiwo Notebook
           </p>
         </div>
-        <div className="flex items-center gap-1.5">
-          <ThemeToggle />
-          <button
-            onClick={() => setSettingsOpen(true)}
-            title="Settings"
-            aria-label="Settings"
-            className="flex h-8 w-8 items-center justify-center rounded-full border border-black/[0.05] bg-white text-zinc-500 transition-all hover:text-zinc-800 dark:border-white/10 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-          >
-            <Settings className="h-3.5 w-3.5" strokeWidth={2} />
-          </button>
-        </div>
+        <ThemeToggle />
       </header>
 
       <div
@@ -815,16 +803,6 @@ export default function Home() {
           );
         })}
       </nav>
-
-      {settingsOpen && (
-        <SettingsPanel
-          onClose={() => setSettingsOpen(false)}
-          onSaved={(msg) => {
-            setNotice(msg);
-            setTimeout(() => setNotice(null), 3000);
-          }}
-        />
-      )}
     </div>
   );
 }

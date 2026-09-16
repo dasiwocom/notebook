@@ -15,6 +15,9 @@ const LS_LANG = "nb:lang";
 const zh: Record<string, string> = {
   "app.title": "Dasiwo Notebook",
   "settings.title": "设置",
+  "settings.appearance": "外观",
+  "settings.appearance.light": "日间",
+  "settings.appearance.dark": "夜间",
   "settings.save": "保存设置",
   "settings.cancel": "取消",
   "settings.language": "语言",
@@ -95,6 +98,9 @@ const zh: Record<string, string> = {
 const en: Record<string, string> = {
   "app.title": "Dasiwo Notebook",
   "settings.title": "Settings",
+  "settings.appearance": "Appearance",
+  "settings.appearance.light": "Light",
+  "settings.appearance.dark": "Dark",
   "settings.save": "Save settings",
   "settings.cancel": "Cancel",
   "settings.language": "Language",
