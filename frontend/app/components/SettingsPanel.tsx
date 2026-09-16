@@ -191,7 +191,7 @@ export default function SettingsPanel({
       onClick={onClose}
     >
       <div
-        className="flex max-h-[85vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-black/[0.06] bg-white shadow-2xl dark:border-white/10 dark:bg-zinc-900"
+        className="flex max-h-[85vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-black/[0.06] bg-white shadow-2xl dark:border-white/10 dark:bg-[#22262b]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex h-12 shrink-0 items-center justify-between border-b border-black/[0.05] px-5 dark:border-white/10">
@@ -397,7 +397,7 @@ export default function SettingsPanel({
           <button
             onClick={save}
             disabled={saving}
-            className="press flex items-center gap-1.5 rounded-full border border-black/[0.06] bg-[var(--card)] px-4 py-2 text-[13px] font-medium text-zinc-700 transition-colors hover:bg-zinc-100 disabled:opacity-50 dark:border-white/10 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+            className="press flex items-center gap-1.5 rounded-full border border-black/[0.06] bg-[var(--card)] px-4 py-2 text-[13px] font-medium text-zinc-700 transition-colors hover:bg-zinc-100 disabled:opacity-50 dark:border-white/10 dark:bg-[#1f2327] dark:text-zinc-200 dark:hover:bg-[#2a2d33]"
           >
             {saving ? (
               <LoaderCircle className="h-3.5 w-3.5 animate-spin" strokeWidth={2} />

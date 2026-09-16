@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Moon, Settings, Sun } from "lucide-react";
 import { useI18n } from "../lib/i18n";
+import SettingsPanel from "./SettingsPanel";
 
 type Mode = "light" | "dark";
 
@@ -22,6 +23,7 @@ export function ThemeToggle() {
   const { lang, setLang, t } = useI18n();
   const [mode, setMode] = useState<Mode>("light");
   const [open, setOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -49,10 +51,19 @@ export function ThemeToggle() {
   }, [open]);
 
   const set = (next: Mode) => {
+    // 切换期间禁用过渡，避免面板/背景/按钮换色不同步
+    document.documentElement.classList.add("no-theme-transition");
     setMode(next);
     localStorage.setItem("theme", next);
     apply(next);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() =>
+        document.documentElement.classList.remove("no-theme-transition")
+      );
+    });
   };
+
+  const row = "flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left text-[13px] text-zinc-600 transition-colors hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-[#32383e]";
 
   return (
     <div ref={ref} className="relative">
@@ -105,7 +116,7 @@ export function ThemeToggle() {
           <p className="px-2 pb-1 pt-2.5 text-[11px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
             Language
           </p>
-          <div className="flex items-center justify-between rounded-lg px-2 py-1.5">
+          <div className="px-2 pb-1">
             <select
               value={lang}
               onChange={(e) => {
@@ -118,7 +129,28 @@ export function ThemeToggle() {
               <option value="en">English</option>
             </select>
           </div>
+
+          <p className="px-2 pb-1 pt-2.5 text-[11px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
+            {t("chat.title")}
+          </p>
+          <button
+            onClick={() => {
+              setSettingsOpen(true);
+              setOpen(false);
+            }}
+            className={row}
+          >
+            <Settings className="h-4 w-4" strokeWidth={2} />
+            {t("settings.title")}
+          </button>
         </div>
+      )}
+
+      {settingsOpen && (
+        <SettingsPanel
+          onClose={() => setSettingsOpen(false)}
+          onSaved={() => setSettingsOpen(false)}
+        />
       )}
     </div>
   );

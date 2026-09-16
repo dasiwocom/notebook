@@ -77,6 +77,14 @@ body {
     border-color 0.25s var(--ease-out);
 }
 
+/* 主题切换瞬间：元素自带 transition-all/transition-colors（150ms）与全局 250ms 混用会导致
+   面板/背景/按钮进度不一致；切换期间统一禁用过渡，翻完再恢复，保证整体同步换色 */
+html.no-theme-transition *,
+html.no-theme-transition *::before,
+html.no-theme-transition *::after {
+  transition: none !important;
+}
+
 /* SVG 图标按钮重绘一帧闪屏：强制图标独立合成层（宿主用按钮，别加在有形变的 SVG 上） */
 button svg,
 a svg,

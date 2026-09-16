@@ -14,14 +14,12 @@ import {
   RotateCcw,
   Save,
   SendHorizontal,
-  Settings,
   Sparkles,
   Square,
   Trash2,
 } from "lucide-react";
 import type { ChatMessage } from "../lib/types";
 import type { ConversationInfo } from "../lib/api";
-import SettingsPanel from "./SettingsPanel";
 import { useI18n } from "../lib/i18n";
 
 type Props = {
@@ -346,7 +344,6 @@ export function ChatPanel({
 }: Props) {
   const { t } = useI18n();
   const [input, setInput] = useState("");
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [convMenuOpen, setConvMenuOpen] = useState(false);
@@ -506,30 +503,11 @@ export function ChatPanel({
                 <Download className="h-4 w-4" strokeWidth={2} />
                 Export .md
               </button>
-              <button
-                onClick={() => {
-                  setSettingsOpen(true);
-                  setMenuOpen(false);
-                }}
-                className="flex w-full items-center gap-2.5 px-3 py-2 text-[13px] text-zinc-600 transition-colors hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-[#32383e]"
-              >
-                <Settings className="h-4 w-4" strokeWidth={2} />
-                Settings
-              </button>
             </div>
           )}
         </div>
       </div>
 
-      {settingsOpen && (
-        <SettingsPanel
-          onClose={() => setSettingsOpen(false)}
-          onSaved={(msg) => {
-            setNotice(msg);
-            setTimeout(() => setNotice(null), 3000);
-          }}
-        />
-      )}
       {notice && (
         <div className="pointer-events-none fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full bg-zinc-900 px-4 py-2 text-xs text-white shadow-lg dark:bg-zinc-100 dark:text-zinc-900">
           {notice}
